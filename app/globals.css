@@ -1,0 +1,60 @@
+/* Layer order: the design's layout primitives (od-layout, e.g. inline icons) must
+   outrank Tailwind's base resets (which make every svg display:block). */
+@layer theme, base, od-layout, components, utilities;
+
+/* Design system exported from Open Design (design/system, design/prototypes).
+   Fonts and layout primitives first (an @import must precede other rules), then
+   the prototypes' component styles (generated copy; see scripts/sync-design-css.mjs).
+   Cascade order is unaffected: Tailwind's base styles live in a lower layer. */
+@import "../design/prototypes/assets/fonts/source-serif.css";
+@import "../design/prototypes/assets/fonts/geist.css";
+@import "../design/prototypes/assets/fonts/geist-mono.css";
+@import "../design/prototypes/assets/layout.css";
+@import "./design-components.generated.css";
+@import "tailwindcss";
+/* tokens.css is the stable contract (variable names) between design and code. */
+@import "../design/system/tokens.css";
+
+/* Map the design tokens onto Tailwind so utilities (bg-surface, text-muted, …)
+   follow the same values in light and dark themes. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-warm: var(--surface-warm);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-muted: var(--muted);
+  --color-meta: var(--meta);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-accent: var(--accent);
+  --color-accent-on: var(--accent-on);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+/* App-specific additions that the prototypes didn't need. */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bio {
+  white-space: pre-line;
+  color: var(--fg-2);
+}
+/* The prototype hides the account block on phones; keep it (and Sign out)
+   reachable inside the open menu. */
+@media (max-width: 767px) {
+  .app.menu-open .account {
+    display: flex;
+  }
+}

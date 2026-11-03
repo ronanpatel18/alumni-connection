@@ -1,0 +1,144 @@
+{
+  "name": "Alumni Connect",
+  "version": "1.0.0",
+  "description": "Private professional network design system for UW\u2013Madison alumni",
+  "entry": "tokens.css",
+  "documentation": "DESIGN.md",
+  "componentPreview": "../screens/components.html",
+  "screenDirectory": "../screens/catalog.html",
+  "prototypeEntry": "../index.html",
+  "themes": {
+    "default": "system",
+    "light": "[data-theme=\"light\"]",
+    "dark": "[data-theme=\"dark\"]"
+  },
+  "platform": {
+    "target": "responsive-web",
+    "application": "Next.js 16 / React 19 / Tailwind CSS 4",
+    "minimumViewport": 375,
+    "breakpoints": [
+      375,
+      768,
+      1024,
+      1440
+    ]
+  },
+  "accessibility": {
+    "target": "WCAG 2.2 AA",
+    "audited": false,
+    "focus": "--focus-ring",
+    "reducedMotion": true
+  },
+  "fonts": [
+    {
+      "family": "Source Serif 4",
+      "role": "display",
+      "stylesheet": "../assets/fonts/source-serif.css",
+      "license": "SIL OFL 1.1"
+    },
+    {
+      "family": "Geist",
+      "role": "body",
+      "stylesheet": "../assets/fonts/geist.css",
+      "license": "SIL OFL 1.1"
+    },
+    {
+      "family": "Geist Mono",
+      "role": "mono",
+      "stylesheet": "../assets/fonts/geist-mono.css",
+      "license": "SIL OFL 1.1"
+    }
+  ],
+  "requiredTokens": [
+    "--bg",
+    "--surface",
+    "--surface-warm",
+    "--fg",
+    "--fg-2",
+    "--muted",
+    "--meta",
+    "--border",
+    "--border-soft",
+    "--accent",
+    "--accent-on",
+    "--accent-hover",
+    "--accent-active",
+    "--success",
+    "--warn",
+    "--danger",
+    "--font-display",
+    "--font-body",
+    "--font-mono",
+    "--text-xs",
+    "--text-sm",
+    "--text-base",
+    "--text-lg",
+    "--text-xl",
+    "--text-2xl",
+    "--leading-body",
+    "--leading-tight",
+    "--space-1",
+    "--space-2",
+    "--space-3",
+    "--space-4",
+    "--space-5",
+    "--space-6",
+    "--space-7",
+    "--space-8",
+    "--space-9",
+    "--space-10",
+    "--space-11",
+    "--space-12",
+    "--radius-sm",
+    "--radius-md",
+    "--radius-lg",
+    "--radius-pill",
+    "--elev-ring",
+    "--elev-raised",
+    "--focus-ring",
+    "--motion-fast",
+    "--ease-standard",
+    "--container-max"
+  ],
+  "additionalTokens": [
+    "--accent-soft",
+    "--success-soft",
+    "--warn-soft",
+    "--text-display",
+    "--motion-exit",
+    "--sidebar-width",
+    "--target-min"
+  ],
+  "components": [
+    "AppShell",
+    "MemberRow",
+    "ProfileStatus",
+    "ContactDetail",
+    "SourceDisclosure",
+    "AISummary",
+    "AIDraft",
+    "LabeledField",
+    "InlineFeedback",
+    "PrivateNote",
+    "ConsentStep",
+    "EmptyState",
+    "Skeleton",
+    "Dialog",
+    "ResponsiveTable",
+    "RecordCountBreakdown"
+  ],
+  "dataPolicy": {
+    "fictionalOnly": true,
+    "emailDomain": "example.com",
+    "phonePattern": "555-01xx",
+    "externalServices": "simulated"
+  },
+  "assets": {
+    "fontSources": "../assets/fonts/credits.json",
+    "licenses": [
+      "../assets/fonts/source-serif-OFL.txt",
+      "../assets/fonts/geist-OFL.txt",
+      "../assets/fonts/geist-mono-OFL.txt"
+    ]
+  }
+}
