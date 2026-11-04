@@ -72,8 +72,17 @@ export function splitName(fullName: string): { firstName: string; lastName: stri
   return { firstName: first, lastName: core.length > 1 ? core[core.length - 1] : "" };
 }
 
+/**
+ * Seniority from a job title. The role is judged by the title's first clause:
+ * "Associate, COO Office of Technology" is an associate, not a COO.
+ */
 export function seniorityFor(title: string | null): Seniority | null {
   if (!title) return null;
+  const head = title.split(",")[0];
+  return seniorityOf(head) ?? (head === title ? null : seniorityOf(title));
+}
+
+function seniorityOf(title: string): Seniority | null {
   const t = title.toLowerCase();
   if (/\b(founder|co-founder|owner)\b/.test(t)) return "owner";
   if (/\b(ceo|cfo|coo|cio|cto|cmo|chief|president|chair(man|woman)?)\b/.test(t) && !/vice president/.test(t)) return "c_suite";

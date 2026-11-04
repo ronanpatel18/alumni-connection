@@ -4,7 +4,7 @@ import { DEV_LOGIN_PATH, devAutoLoginEmail } from "@/lib/dev-auto-login";
 
 // Pages that require a signed-in user. Verification (member vs. pending) is
 // checked in the pages themselves, since it needs a database lookup.
-const PROTECTED_PREFIXES = ["/discover", "/search", "/people", "/saved", "/me", "/admin", "/pending"];
+const PROTECTED_PREFIXES = ["/discover", "/search", "/people", "/saved", "/messages", "/introductions", "/trips", "/insights", "/me", "/admin", "/pending"];
 
 /** Refreshes the Supabase session cookie on every request and gates protected pages. */
 export async function proxy(request: NextRequest) {

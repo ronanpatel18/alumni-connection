@@ -2,32 +2,41 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Icon } from "@/components/icon";
-import { EmptyState, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
+import { EmptyState, PageTitle, PersonRow } from "@/components/person";
+import { Relevance } from "@/components/relevance";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
+import { GOALS, suggestionReasons, suggestions } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 
 export const metadata: Metadata = { title: "Discover" };
 
-const STARTING_GROUP = { slug: "wsb-external-advisory-board", name: "WSB External Advisory Board" };
 const SEARCH_HINTS = ["Real estate in Chicago", "Finance in New York", "Technology in Seattle"];
+const DEFAULT_GOAL = "partners" as const;
 
+/** A few starting points ranked for the member's goal, each with its reason. */
 async function StartingPoints() {
   const viewer = await requireMember("/discover");
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("search_people", { p_group_slug: STARTING_GROUP.slug, p_limit: 3 });
-  if (error) throw error;
-  const people = (data ?? []) as PersonSummary[];
-  const ids = people.map((p) => p.id);
-  const [saved, cues, linkedin] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids), linkedinUrls(supabase, ids)]);
-
-  if (!people.length) {
+  const list = await suggestions(supabase, viewer, { goal: DEFAULT_GOAL, placeId: null, limit: 3 });
+  if (!list.length) {
     return <EmptyState title="No profiles yet" text="Import a roster or a board listing to start the directory." />;
   }
+  const people = list.map((s) => s.person);
+  const ids = people.map((p) => p.id);
+  const reasons = suggestionReasons(supabase, viewer.userId, DEFAULT_GOAL, null, people);
+  const [saved, cues, linkedin] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids), linkedinUrls(supabase, ids)]);
   return (
     <>
       {people.map((person) => (
-        <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
+        <div key={person.id} className="suggestion">
+          <PersonRow person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
+          <div className="pad suggestion-why">
+            <Suspense fallback={<p className="meta">Writing why they may be relevant…</p>}>
+              <Relevance reasons={reasons} personId={person.id} />
+            </Suspense>
+          </div>
+        </div>
       ))}
     </>
   );
@@ -95,11 +104,16 @@ export default function DiscoverPage() {
               <div className="section-head">
                 <div>
                   <h2>People worth knowing</h2>
-                  <p className="small muted">Starting with the Wisconsin School of Business advisory boards.</p>
+                  <p className="small muted">A few starting points, based on a professional goal.</p>
                 </div>
-                <Link className="btn quiet" href={`/search?group=${STARTING_GROUP.slug}`}>
+                <Link className="btn quiet" href="/discover/who-to-meet">
                   See all <Icon name="arrow" />
                 </Link>
+              </div>
+              <div className="od-cluster small muted" style={{ paddingBottom: 20 }}>
+                <span className="chip ai">AI-assisted suggestions</span>
+                <span>Goal: {GOALS[DEFAULT_GOAL].phrase}</span>
+                <Link href="/discover/who-to-meet">Change goal</Link>
               </div>
             </div>
             <Suspense fallback={<Skeleton />}>
@@ -139,6 +153,14 @@ export default function DiscoverPage() {
                 </div>
               </Link>
             </div>
+          </section>
+          <section className="trip-callout">
+            <div className="eyebrow">Traveling soon?</div>
+            <h2>Make the trip more personal.</h2>
+            <p>Find alumni in your destination, choose a few worth meeting, and start one thoughtful conversation at a time.</p>
+            <Link className="btn primary" href="/trips/new">
+              Plan a trip <Icon name="arrow" />
+            </Link>
           </section>
           <p className="footnote">
             Early access: profiles start from the Wisconsin School of Business advisory boards and public sources.

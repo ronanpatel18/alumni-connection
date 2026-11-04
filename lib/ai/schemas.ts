@@ -72,7 +72,10 @@ export interface CandidateForExplanation {
   city: string | null;
   industryName: string | null;
   gradYear: number | null;
+  /** Things the member and this candidate actually share. Empty if only UW–Madison. */
   sharedContext: string[];
+  /** Boards or groups the candidate belongs to (theirs, not the member's). */
+  groups?: string[];
 }
 
 // ---------------------------------------------------------------------------

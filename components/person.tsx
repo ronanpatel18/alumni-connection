@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { toggleSaved } from "@/app/(member)/actions";
-import { OPEN_TO_LABELS } from "@/lib/labels";
-import { initialsFor } from "./account-block";
+import { initialsFor, OPEN_TO_LABELS } from "@/lib/labels";
 import { Icon } from "./icon";
 
 export interface PersonSummary {
@@ -9,6 +8,7 @@ export interface PersonSummary {
   full_name: string;
   current_title: string | null;
   organization_name: string | null;
+  industry_name?: string | null;
   city: string | null;
   state: string | null;
   metro?: string | null;

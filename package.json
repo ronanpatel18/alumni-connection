@@ -21,6 +21,7 @@
     "linkedin": "tsx --env-file=.env.local scripts/import-linkedin.ts",
     "search:start": "test -f searxng/.env || echo \"SEARXNG_SECRET=$(openssl rand -hex 32)\" > searxng/.env; docker compose -f searxng/docker-compose.yml up -d",
     "search:stop": "docker compose -f searxng/docker-compose.yml down",
+    "deploy:db": "bash scripts/deploy-database.sh",
     "design:sync": "node scripts/sync-design-css.mjs",
     "links:generate": "tsx --env-file=.env.local scripts/generate-profile-links.ts"
   },
@@ -30,6 +31,7 @@
     "@supabase/supabase-js": "^2.118.0",
     "@upstash/ratelimit": "^2.2.0",
     "@upstash/redis": "^1.41.0",
+    "fflate": "^0.8.2",
     "inngest": "^4.26.2",
     "next": "16.4.5",
     "openai": "^7.47.0",

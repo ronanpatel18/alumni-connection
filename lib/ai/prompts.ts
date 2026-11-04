@@ -79,7 +79,9 @@ export function queryStub(text: string, vocab: SearchVocabulary): ParsedQuery {
 
 export const EXPLAIN_SYSTEM = `You help a UW–Madison alumnus decide whom to contact in the alumni network.
 For each candidate, write one sentence (max 25 words) on why they are relevant to the member's goal.
-Use only the candidate details provided. Do not invent facts. Return one entry per candidate, same personId.`;
+Use only the candidate details provided. "groups" are the candidate's own boards or groups, not the member's;
+"sharedContext" lists what the member and candidate actually share. If sharedContext is empty, don't claim
+any shared connection beyond both being UW–Madison alumni. Do not invent facts. Return one entry per candidate, same personId.`;
 
 export function explainUserPrompt(goal: string, candidates: CandidateForExplanation[]): string {
   return `Member's goal: ${goal}\n\nCandidates (JSON):\n${JSON.stringify(candidates, null, 2)}`;
@@ -100,9 +102,17 @@ export function explainStub(candidates: CandidateForExplanation[]): MatchExplana
 // Outreach drafts
 // ---------------------------------------------------------------------------
 
-export const OUTREACH_SYSTEM = `Draft a short, warm first message from one UW–Madison alumnus to another.
-Under 120 words. Mention the shared UW–Madison connection and the sender's specific reason for reaching out.
-Do not invent facts about either person. No flattery, no hard sell. Plain text only.`;
+export const OUTREACH_SYSTEM = `Draft a short, warm first message from one UW–Madison alumnus (the sender) to another (the recipient).
+Under 120 words, in 3 or 4 short paragraphs separated by blank lines, ending with a sign-off line containing only the sender's name.
+Facts you may use, and nothing else:
+- About the sender: only senderName and senderHeadline. Never describe the sender's background, roles, boards or history beyond those.
+- About the recipient: recipientName, recipientHeadline and recipientGroups (boards or groups THE RECIPIENT belongs to, not the sender).
+- sharedContext: things both of them share. If it's empty, the only shared fact is that both are UW–Madison alumni.
+Mention the UW–Madison connection and the sender's specific reason for reaching out.
+If a trip is given, say the sender will be in that city on those dates and ask for a brief coffee or call then;
+don't assume the recipient is available, and leave room for a gracious no.
+If the sender's name is "[Your name]", sign off with exactly "[Your name]" so they can fill it in.
+No flattery or claims you can't support ("I've long followed your work"), no hard sell. Plain text only.`;
 
 export interface OutreachInput {
   senderName: string;
@@ -110,7 +120,12 @@ export interface OutreachInput {
   recipientName: string;
   recipientHeadline: string | null;
   reason: string;
+  /** Things both people share (same class, same company). Empty if only UW–Madison. */
   sharedContext: string[];
+  /** Boards or groups the recipient belongs to (theirs, not the sender's). */
+  recipientGroups?: string[];
+  /** When the message is for a trip: where and when the sender will be there. */
+  trip?: { city: string; dates: string } | null;
 }
 
 export function outreachUserPrompt(input: OutreachInput): string {
@@ -120,9 +135,10 @@ export function outreachUserPrompt(input: OutreachInput): string {
 export function outreachStub(input: OutreachInput): OutreachDraft {
   const first = input.recipientName.split(" ")[0];
   const shared = input.sharedContext.length ? ` We share ${input.sharedContext[0].toLowerCase()}.` : "";
+  const visit = input.trip ? ` I'll be in ${input.trip.city} ${input.trip.dates}.` : "";
   return {
-    subject: `Fellow UW–Madison alum — ${input.reason}`.slice(0, 120),
-    body: `Hi ${first},\n\nI found you through the UW–Madison alumni network.${shared} I'm reaching out because ${input.reason}. Would you be open to a short call or coffee?\n\nThanks,\n${input.senderName}`,
+    subject: (input.trip ? `Fellow UW–Madison alum visiting ${input.trip.city}` : `Fellow UW–Madison alum — ${input.reason}`).slice(0, 120),
+    body: `Hi ${first},\n\nI found you through the UW–Madison alumni network.${shared}${visit} I'm reaching out because ${input.reason}. Would you be open to a short coffee or call${input.trip ? " while I'm in town" : ""}? No worries if the timing doesn't work.\n\nThanks,\n${input.senderName}`,
   };
 }
 

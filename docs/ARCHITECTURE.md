@@ -343,13 +343,14 @@ Data and backend work (Phase 0–1 schema, enrichment, auth) doesn't wait on des
   - Admin review queue.
 - **Phase 2 (intelligence):**
   - Natural-language search.
-  - Relevance ranking with "why".
-  - LinkedIn CSV import and mutual connections.
-  - Intro engine.
-  - Trip/meeting planner with outreach drafts.
+  - Relevance ranking with "why". **Built** (`lib/recommendations.ts`, `/discover/who-to-meet`): rule-based order per goal, AI writes the reason only.
+  - LinkedIn CSV import and mutual connections. **Built** (`/me/linkedin`, migration `…1500_linkedin_import`): the export is parsed in the browser; matches go to a private `my_connections` table rather than `edges`, so members without a claimed profile can use it.
+  - Intro engine. **Built** (double opt-in with consent events; migration `…1300_introductions`); 2-hop paths will use `edges` as members import connections.
+  - Trip/meeting planner with outreach drafts. **Built** (`app/(member)/trips`, `lib/trips.ts`, migration `…1200_trips`); the email relay and booked meetings are still to come.
   - Follow-up reminders.
+  - Private messaging **built** instead of an email-alias relay (migration `…1600_messages`): messages stay in the app, email notifications carry no content or addresses, members only.
 - **Phase 3 (network intelligence):**
-  - Industry and market analytics (verified vs estimated).
+  - Industry and market analytics (verified vs estimated). **Built** (`/insights`, `network_insights()`, migration `…1400_network_insights`).
   - Business directory.
   - Mentorship matching.
   - Events by city.

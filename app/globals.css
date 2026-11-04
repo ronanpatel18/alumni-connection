@@ -122,3 +122,139 @@ dialog {
 .glance-list li::marker {
   color: var(--accent);
 }
+/* Trips (design/prototypes/screens/trips.html, trip-shortlist.html). */
+.trip-row {
+  border-top: 1px solid var(--border-soft);
+}
+.trip-row:first-child {
+  border-top: 0;
+}
+.trip-city {
+  font-size: 36px;
+  margin-top: 20px;
+}
+.trip-city a {
+  color: var(--fg);
+  text-decoration: none;
+}
+.trip-goal {
+  margin-top: 16px;
+  color: var(--fg-2);
+}
+.trip-section {
+  border-top: 1px solid var(--border-soft);
+  font-size: var(--text-lg, 18px);
+}
+.trip-candidate {
+  border-top: 1px solid var(--border-soft);
+}
+.trip-candidate:first-child {
+  border-top: 0;
+}
+.trip-candidate .person {
+  border-top: 0;
+}
+.trip-relevance {
+  padding-top: 0;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.trip-relevance .btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Who to meet (design/prototypes/screens/recommendations.html). */
+.suggestion .person {
+  border-top: 0;
+}
+.suggestion-why {
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.suggestion-why .small {
+  color: var(--fg-2);
+}
+/* Introductions (design/prototypes/screens/introductions.html). */
+.intro-row {
+  display: grid;
+  gap: 4px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--fg);
+  text-decoration: none;
+}
+.intro-row:hover {
+  background: var(--bg);
+}
+.connector-choice {
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  align-items: center;
+}
+.connector-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Insights (design/prototypes/screens/insights.html). */
+.insight-charts {
+  align-items: start;
+}
+.bar-row {
+  grid-template-columns: minmax(110px, 160px) 1fr 40px;
+}
+.bar-label {
+  overflow-wrap: anywhere;
+}
+.bar-label a {
+  color: var(--fg);
+}
+@media (max-width: 767px) {
+  .insight-charts {
+    grid-template-columns: 1fr;
+  }
+}
+.more-rows {
+  border-bottom: 0;
+  padding: 8px 0 0;
+}
+.more-rows summary {
+  margin-top: 16px;
+  color: var(--accent);
+}
+.steps-list {
+  padding-left: 20px;
+  list-style: decimal;
+  display: grid;
+  gap: 8px;
+  color: var(--fg-2);
+}
+/* Messages: a simple two-sided thread. */
+.thread {
+  display: grid;
+  gap: 12px;
+}
+.bubble {
+  max-width: 85%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  display: grid;
+  gap: 4px;
+}
+.bubble.mine {
+  justify-self: end;
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.reply-form {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 16px;
+}
+.intro-row.unread strong {
+  color: var(--accent);
+}

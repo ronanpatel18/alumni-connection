@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { EmptyState, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
+import { RelationshipTabs } from "@/components/relationship-tabs";
 import { groupCues, linkedinUrls } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
@@ -107,6 +108,7 @@ export default function SavedPage({ searchParams }: PageProps<"/saved">) {
         title="People you want to stay close to."
         description="Saved contacts are private. Saving someone doesn’t notify them."
       />
+      <RelationshipTabs />
       <Suspense>
         <SavedSearch searchParams={searchParams} />
       </Suspense>

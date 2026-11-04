@@ -1,5 +1,6 @@
 import { AdminNavItem } from "@/components/app-frame";
 import { createClient } from "@/lib/supabase/server";
+import { initialsFor } from "@/lib/labels";
 import { getViewer } from "@/lib/viewer";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -10,14 +11,8 @@ const ROLE_LABELS: Record<string, string> = {
   pending: "Verification pending",
 };
 
-export function initialsFor(name: string) {
-  return name
-    .split(/[\s@._-]+/)
-    .filter((part) => /^[A-Za-z]/.test(part))
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join("");
-}
+// Kept here for existing imports; it lives in lib/labels so client components can use it.
+export { initialsFor } from "@/lib/labels";
 
 export async function AccountBlock() {
   const viewer = await getViewer();

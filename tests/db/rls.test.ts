@@ -148,33 +148,21 @@ describe("private CRM data", () => {
 });
 
 describe("intro requests", () => {
-  it("follow the double opt-in order", async () => {
+  it("can only change through the consent functions (tests/db/introductions.test.ts)", async () => {
     const { rows } = await db.query<{ id: string }>(
       "select id from people where status = 'seeded' and id not in ($1, $2) limit 1",
       [memberPersonId, otherPersonId],
     );
-    const target = rows[0].id;
-
-    // memberUser asks otherMember (connector) to introduce them to `target`.
-    const created = await asUser(db, memberUser, () =>
-      db.query<{ id: string }>(
-        "insert into intro_requests (requester_user_id, connector_person_id, target_person_id, goal) values ($1, $2, $3, 'Learn about CRE in Chicago') returning id",
-        [memberUser, otherPersonId, target],
-      ),
-    );
-    const introId = created.rows[0].id;
-
-    // The connector can't skip straight to "accepted"...
+    // Writing a request or jumping its status directly is refused.
     await expect(
-      asUser(db, otherMember, () => db.query("update intro_requests set status = 'accepted' where id = $1", [introId])),
-    ).rejects.toThrow(/row-level security/);
-
-    // ...but can forward it to the target.
-    await asUser(db, otherMember, () =>
-      db.query("update intro_requests set status = 'pending_target' where id = $1", [introId]),
-    );
-    const { rows: after } = await db.query<{ status: string }>("select status from intro_requests where id = $1", [introId]);
-    expect(after[0].status).toBe("pending_target");
+      asUser(db, memberUser, () =>
+        db.query(
+          "insert into intro_requests (requester_user_id, connector_person_id, target_person_id, goal) values ($1, $2, $3, 'Learn about CRE in Chicago')",
+          [memberUser, otherPersonId, rows[0].id],
+        ),
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(asUser(db, otherMember, () => db.query("update intro_requests set status = 'accepted'"))).rejects.toThrow(/permission denied/);
   });
 });
 

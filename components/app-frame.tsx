@@ -6,11 +6,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Brand } from "./brand";
 import { Icon, type IconName } from "./icon";
 
-// Only areas that exist today. Trips, Insights and Administration join this list
-// as they're built (their prototypes are in design/prototypes/screens).
+// The member areas from the design's navigation model; Administration shows for admins.
 const NAV: { href: string; label: string; icon: IconName; matches: string[] }[] = [
   { href: "/discover", label: "Discover", icon: "search", matches: ["/discover", "/search", "/people"] },
-  { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved"] },
+  { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved", "/messages", "/introductions"] },
+  { href: "/trips", label: "Trips", icon: "trip", matches: ["/trips"] },
+  { href: "/insights", label: "Insights", icon: "chart", matches: ["/insights"] },
 ];
 const UTILITY_NAV = { href: "/me", label: "Profile & privacy", icon: "settings" as const, matches: ["/me"] };
 // Shown only to administrators (the layout passes <AdminNavItem /> for them).

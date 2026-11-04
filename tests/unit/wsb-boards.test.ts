@@ -54,3 +54,12 @@ describe("isSuppressed", () => {
     expect(isSuppressed(hammes, [{ full_name: "patrick hammes ", source: null, external_id: null }])).toBe(true);
   });
 });
+
+describe("seniorityFor", () => {
+  it("judges the role by the title's first clause", () => {
+    expect(seniorityFor("Associate, COO Office of Technology & Innovations")).toBe("mid");
+    expect(seniorityFor("Managing Director, West Coast")).toBe("partner");
+    expect(seniorityFor("SVP & CFO")).toBe("c_suite");
+    expect(seniorityFor("Founder and CIO")).toBe("owner");
+  });
+});

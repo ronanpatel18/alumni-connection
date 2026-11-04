@@ -236,6 +236,7 @@ npm run inngest:dev
 | `npm run import:wsb-boards` | Import WSB advisory-board members from `data/sources/` |
 | `npm run enrich -- [--group slug] [--concurrency N] [--dry-run]` | Extract degrees, location and industry from bios and web search |
 | `npm run class-years -- [--write] [--names "A,B"] [--no-search] [--tavily]` | Find missing class years from stated sources (dry run unless `--write`) |
+| `npm run deploy:db` | Apply migrations to the hosted Supabase project and copy the directory data ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
 | `npm run search:start` / `search:stop` | Start or stop the self-hosted SearXNG search engine (Docker) |
 | `npm run linkedin -- [--write] [--names "A,B"]` | LinkedIn URL, location, work history and UW degrees from search snippets (dry run unless `--write`) |
 
@@ -274,7 +275,56 @@ running the app against local Supabase (needs Docker).
   the AI-summary background job, the advisory-board import with web
   enrichment, claim-or-remove links, profile editing and privacy settings, and the admin
   review queue (profile review and claim requests).
-- Still to build:
+
+**Phase 2 (intelligence), started:**
+
+- Built: the **trip planner** (`/trips`). Pick a city, dates, industries and a
+  goal; get alumni within 50 miles with an "AI-generated relevance" line each
+  (cached per trip, streamed in so the list shows at once); keep a private
+  shortlist; get an "AI-drafted · Editable" first message per person, saved as a
+  private draft, plus a downloadable tentative calendar invitation. Nothing is
+  sent by the app: there's no email relay yet, so members copy the message or
+  open it in their email or LinkedIn. Follows `design/prototypes/HANDOFF.md`
+  (Trips flow) and `design/system/DESIGN.md` (AI labels, no scores).
+- Built: **who to meet** (`/discover/who-to-meet`, top three on Discover).
+  Choose a goal (partnerships, clients and referrals, investors, a mentor) and
+  a market; suggestions are ordered by plain signals (seniority, industry,
+  experience, what people say they're open to, confirmed profiles) and each gets
+  an "AI-generated relevance" line plus an evidence line. No score is shown.
+- Built: **introductions** (`/introductions`, "A warmer introduction" on
+  profiles). Ask a member who knows someone (a shared board or a recorded
+  connection) to introduce you. The connector decides first ("I'm happy to
+  introduce them" / "Decline quietly"); the recipient is asked only if they
+  agree, and only two yeses complete it. Every decision is an append-only
+  consent event (`intro_events`); state changes only through checked database
+  functions; requests can be cancelled and expire after 30 days; nobody sees
+  another role's controls. Notifications are in-app for now (no email relay).
+- Built: **network insights** (`/insights`). Counts by market and industry,
+  filterable by industry and city, always split into confirmed and unconfirmed
+  records (solid and patterned bars, with numbers). Every record is counted:
+  cities outside the places list are kept, and records with no location or
+  industry are reported as such. The population estimate shows "—
+  unavailable"; nothing is extrapolated.
+- Built: **LinkedIn import** (`/me/linkedin`). Members upload their own
+  LinkedIn data export (the ZIP or its CSVs); it's read in the browser and never
+  stored. Members with a claimed profile can add their work history and
+  UW–Madison degrees (recorded as member-provided; nothing is overwritten).
+  Connections are matched to the directory by LinkedIn profile URL, or full name
+  plus employer (never name alone); only matches are kept, visible only to the
+  member ("In your LinkedIn connections" on profiles), and removable anytime.
+- Built: **private messages** (`/messages`), the design's "relay". Members
+  message each other inside Alumni Connect; the recipient gets an email saying
+  who wrote (never the message, never an address) with a link, and replies
+  happen here. Only members can be messaged; new conversations are limited to
+  20 a day per sender. Trip outreach can send its draft this way to members,
+  profiles of members have "Send a message", and every introduction step emails
+  whoever is next. Emails go to the local Mailpit inbox in development and
+  through Resend (`RESEND_API_KEY`, `EMAIL_FROM`) in production; the
+  `notifications` table is the outbox.
+- Deployment: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (Vercel + hosted Supabase;
+  `npm run deploy:db` sets up the hosted database).
+
+**Phase 1, still to build:**
   - Roster CSV import.
   - Enrichment pipeline v1 (People Data Labs + web verification).
   - Full GeoNames city table.

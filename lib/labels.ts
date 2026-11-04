@@ -38,3 +38,13 @@ export const ALUMNI_STATUS_LABELS: Record<string, string> = {
   unknown: "Unknown",
   not_alumnus: "Not a UW–Madison alum",
 };
+
+/** Two-letter initials for an avatar ("Tim Bratland" → "TB", "you@example.com" → "YE"). */
+export function initialsFor(name: string) {
+  return name
+    .split(/[\s@._-]+/)
+    .filter((part) => /^[A-Za-z]/.test(part))
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+}

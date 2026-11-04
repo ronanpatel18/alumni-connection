@@ -7,6 +7,7 @@ const TABS = [
   { href: "/me", label: "Edit profile" },
   { href: "/me/privacy", label: "Privacy & visibility" },
   { href: "/me/sources", label: "Data sources" },
+  { href: "/me/linkedin", label: "LinkedIn import" },
 ];
 
 export function ProfileTabs() {

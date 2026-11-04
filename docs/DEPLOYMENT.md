@@ -1,0 +1,97 @@
+# Deploying Alumni Connect
+
+Hosting: **Vercel** (the Next.js app, deployed from GitHub) and a hosted **Supabase**
+project (database, sign-in). Both have free tiers; Vercel's Hobby plan is for
+non-commercial use, so move to Pro before a commercial launch. Total time: about 30 minutes.
+
+Steps marked **(you)** need your own accounts; everything else is scripted.
+
+## 1. Create the Supabase project (you)
+
+1. At https://supabase.com/dashboard, **New project**. Name it `alumni-connect`, pick a
+   US region near your users (e.g. East US), and set a strong database password
+   (keep it; you'll need it once in step 2).
+2. When it's ready, open **Connect** and copy the **Session pooler** connection string.
+3. Paste it into `.env.production.local` (git-ignored) as `PROD_DB_URL=...`, replacing
+   `[YOUR-PASSWORD]` with the password.
+
+## 2. Set up the database
+
+```bash
+npm run deploy:db
+```
+
+Applies every migration in `supabase/migrations/`, then copies the directory data from
+your local database (people, organizations, positions, education, contact details,
+sources, groups, removal requests, admin reviews). Accounts, notes, trips, messages
+and introductions are not copied. Safe to re-run.
+
+## 3. Configure sign-in (you)
+
+In the Supabase dashboard:
+
+- **Authentication → URL Configuration**
+  - Site URL: your Vercel address from step 4 (e.g. `https://alumni-connect.vercel.app`).
+  - Redirect URLs: add `https://<your-domain>/**`.
+- **Authentication → Emails → SMTP Settings**: turn on custom SMTP. Supabase's built-in
+  email only sends a few messages an hour, and only to your own team, so real members
+  can't sign in without this. With Resend (free tier, needs a domain you control):
+  host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key,
+  sender = an address on your verified domain.
+
+## 4. Deploy to Vercel (you, then automatic)
+
+1. At https://vercel.com/new, import the GitHub repository `ronanpatel18/alumni-connection`.
+   The defaults (Next.js, `npm run build`) are right.
+2. Before the first deploy, add these **Environment Variables** (Production):
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase → API Keys → publishable key |
+| `SUPABASE_SECRET_KEY` | Supabase → API Keys → secret key (server only) |
+| `NEXT_PUBLIC_SITE_URL` | your Vercel address, e.g. `https://alumni-connect.vercel.app` |
+| `AI_MODE` | `live` |
+| `AI_EXTRACT_PROVIDER` / `AI_WRITE_PROVIDER` | `gemini` |
+| `AI_EXTRACT_MODEL` / `AI_WRITE_MODEL` | `gemini-3.1-flash-lite` |
+| `AI_EMBED_PROVIDER` | `fixture` |
+| `GEMINI_API_KEY` | your Google AI Studio key |
+| `RESEND_API_KEY` | Resend API key (message and introduction emails) |
+| `EMAIL_FROM` | e.g. `Alumni Connect <notifications@your-domain>` |
+
+Recommended: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (free at
+https://upstash.com). Without them, rate limits are counted per server instance, which
+on Vercel means they're weak.
+
+Never set `DEV_AUTO_LOGIN_EMAIL` or `INNGEST_DEV` in production (the auto sign-in is
+ignored outside `next dev` anyway). Inngest is optional for now: the existing AI
+summaries are copied with the people in step 2, and nothing in the app waits on a
+background job. Add `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` when you want summaries
+written automatically for new profiles.
+
+3. Deploy. After that, every push to `main` deploys automatically.
+
+## 5. Make yourself an administrator
+
+Sign in once on the live site with your email, then in Supabase → SQL Editor:
+
+```sql
+update public.members set role = 'admin', verified_at = now(), verification_method = 'admin'
+ where email = 'you@your-domain.edu';
+```
+
+## 6. Check it
+
+- Sign in by email link; Discover, Search, Insights and a profile load.
+- Administration → Profile review lists profiles.
+- Plan a trip and open a shortlist (AI relevance lines appear).
+- `https://<your-domain>/robots.txt` disallows everything, and responses carry
+  `X-Robots-Tag: noindex` (the network is private).
+
+## Later
+
+- Private claim/remove links: `npm run links:generate` makes links for the site in
+  `NEXT_PUBLIC_SITE_URL`; run it with the production URL set before sending invitations.
+- Profile data scripts (`import:wsb-boards`, `enrich`, `class-years`, `linkedin`) run from
+  your machine; point them at production by running them with the production
+  `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY`.

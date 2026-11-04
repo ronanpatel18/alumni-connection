@@ -68,6 +68,41 @@ function visibilityNote(point: ContactPoint) {
   return `${reason} · ${SOURCE_LABELS[point.source] ?? point.source}`;
 }
 
+/** Members who could introduce you (shared board or recorded connection), and the way to ask. */
+async function WarmIntro({ personId, firstName, isMe }: { personId: string; firstName: string; isMe: boolean }) {
+  if (isMe) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("intro_connectors", { p_target: personId });
+  const connectors = (data ?? []) as { person_id: string; full_name: string; shared: string }[];
+  return (
+    <section className="panel pad">
+      <h2 className="rail-title">A warmer introduction</h2>
+      {connectors.length ? (
+        <>
+          <div className="detail-list">
+            {connectors.slice(0, 3).map((c) => (
+              <div key={c.person_id} className="detail-row">
+                <strong className="small">{c.full_name}</strong>
+                <span className="meta">Shared: {c.shared}</span>
+              </div>
+            ))}
+          </div>
+          <div className="form-actions">
+            <Link className="btn" href={`/introductions/new?person=${personId}`}>
+              Ask for an introduction
+            </Link>
+          </div>
+        </>
+      ) : (
+        <p className="small muted">
+          No member who knows {firstName} has joined yet. Start with a brief, thoughtful message, or check back once someone on their board
+          claims their profile.
+        </p>
+      )}
+    </section>
+  );
+}
+
 async function Profile({ params, searchParams }: { params: PageProps<"/people/[id]">["params"]; searchParams: PageProps<"/people/[id]">["searchParams"] }) {
   const { id } = await params;
   const { claimed: justClaimed } = await searchParams;
@@ -75,7 +110,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
   const supabase = await createClient();
-  const [{ data: person }, { data: saved }, { data: notes }] = await Promise.all([
+  const [{ data: person }, { data: saved }, { data: notes }, { data: knownOnLinkedIn }] = await Promise.all([
     supabase
       .from("people")
       .select(
@@ -95,6 +130,8 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
       .eq("person_id", id)
       .order("created_at", { ascending: false })
       .returns<{ id: string; body: string; created_at: string }[]>(),
+    // From the member's own LinkedIn import; visible only to them.
+    supabase.from("my_connections").select("person_id").eq("owner_user_id", viewer.userId).eq("person_id", id).maybeSingle(),
   ]);
   if (!person) notFound();
 
@@ -143,7 +180,14 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
       <section className="profile-heading" style={{ marginBottom: 32 }}>
         <Avatar name={person.full_name} photoUrl={person.photo_url} confirmed={confirmed} size="large" />
         <div className="identity">
-          <StatusBadge status={person.status} />
+          <div className="od-cluster">
+            <StatusBadge status={person.status} />
+            {knownOnLinkedIn && (
+              <span className="chip" title="From your LinkedIn import. Only you can see this.">
+                <Icon name="linkedin" /> In your LinkedIn connections
+              </span>
+            )}
+          </div>
           <h1>{person.full_name}</h1>
           <p>
             {person.current_title ?? "Role not provided"} · {person.organizations?.name ?? "Employer not provided"}
@@ -159,6 +203,12 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
           </p>
         </div>
         <div className="od-cluster">
+          {/* Members (claimed profiles) can be messaged privately; others through details they've shared. */}
+          {confirmed && person.claimed_by_user_id !== viewer.userId && (
+            <Link className="btn primary" href={`/messages/new?person=${person.id}`}>
+              <Icon name="mail" /> Send a message
+            </Link>
+          )}
           {linkedin && <LinkedInLink name={person.full_name} url={linkedin.value} withText />}
           <SaveButton personId={person.id} name={person.full_name} saved={Boolean(saved)} withText />
         </div>
@@ -320,10 +370,16 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
         </div>
 
         <aside className="right-rail stack">
-          <section className="panel pad">
-            <h2 className="rail-title">A warmer introduction</h2>
-            <p className="small muted">No shared connection is currently recorded. Start with a brief, thoughtful message.</p>
-          </section>
+          <Suspense
+            fallback={
+              <section className="panel pad">
+                <h2 className="rail-title">A warmer introduction</h2>
+                <div className="skeleton" />
+              </section>
+            }
+          >
+            <WarmIntro personId={person.id} firstName={firstName} isMe={person.claimed_by_user_id === viewer.userId} />
+          </Suspense>
 
           <section className="panel pad">
             <h2 className="rail-title">Contact details</h2>

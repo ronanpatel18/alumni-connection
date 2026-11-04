@@ -167,7 +167,9 @@ export function createAi(config: AiConfig = loadAiConfig()): Ai {
         user: outreachUserPrompt(input),
         stub: () => outreachStub(input),
       });
-      return result;
+      // Always end with the sender's sign-off, so a "[Your name]" placeholder is never lost.
+      const body = result.body.trimEnd();
+      return body.endsWith(input.senderName) ? { ...result, body } : { ...result, body: `${body}\n\n${input.senderName}` };
     },
 
     async extractEnrichment(input) {

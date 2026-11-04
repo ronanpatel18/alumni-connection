@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { degreeFromDetails, isUwMadison, type LinkedInPosition, parseLinkedInSnippet } from "@/lib/enrichment/linkedin";
 import { linkedInSnippet, lookupLinkedIn, searchConfigured } from "@/lib/enrichment/search";
+import { seniorityFor } from "@/lib/importers/wsb-boards";
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(name);
@@ -188,7 +189,12 @@ async function main() {
           });
           await db
             .from("people")
-            .update({ current_title: main.title, current_organization_id: orgId, headline: `${main.title} at ${main.organization}` })
+            .update({
+              current_title: main.title,
+              current_organization_id: orgId,
+              headline: `${main.title} at ${main.organization}`,
+              seniority: seniorityFor(main.title),
+            })
             .eq("id", person.id);
           provenance.push({ field: "current_title", confidence: 0.75 }, { field: "current_organization_id", confidence: 0.75 });
         }
