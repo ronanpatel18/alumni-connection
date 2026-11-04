@@ -13,7 +13,7 @@ interface PersonRow {
   organizations: { name: string } | null;
   industries: { name: string } | null;
   educations: { school: string | null; degree: string | null; major: string | null; grad_year: number | null }[];
-  positions: { title: string; organization_name: string; is_current: boolean; start_date: string | null }[];
+  positions: { title: string; organization_name: string; is_current: boolean; start_date: string | null; end_date: string | null }[];
 }
 
 /** Gathers the facts the AI is allowed to summarize. Nothing outside this object reaches the model. */
@@ -26,7 +26,7 @@ export async function loadProfileFacts(
     .select(
       "id, full_name, current_title, bio, city, state, specialties, summary_input_hash, " +
         "organizations:current_organization_id(name), industries:industry_id(name), " +
-        "educations(school, degree, major, grad_year), positions(title, organization_name, is_current, start_date)",
+        "educations(school, degree, major, grad_year), positions(title, organization_name, is_current, start_date, end_date)",
     )
     .eq("id", personId)
     .maybeSingle<PersonRow>();
@@ -49,7 +49,13 @@ export async function loadProfileFacts(
         .map((e) => ({ school: e.school, degree: e.degree, major: e.major, gradYear: e.grad_year })),
       positions: [...data.positions]
         .sort((a, b) => Number(b.is_current) - Number(a.is_current) || (b.start_date ?? "").localeCompare(a.start_date ?? ""))
-        .map((p) => ({ title: p.title, organizationName: p.organization_name, isCurrent: p.is_current })),
+        .map((p) => ({
+          title: p.title,
+          organizationName: p.organization_name,
+          isCurrent: p.is_current,
+          startYear: p.start_date ? Number(p.start_date.slice(0, 4)) : null,
+          endYear: p.end_date ? Number(p.end_date.slice(0, 4)) : null,
+        })),
     },
   };
 }

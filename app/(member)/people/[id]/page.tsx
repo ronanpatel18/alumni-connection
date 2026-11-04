@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { BackToSearch } from "@/components/back-to-search";
 import { DialogButton } from "@/components/dialog-button";
 import { Icon } from "@/components/icon";
-import { Avatar, OPEN_TO_LABELS, PageTitle, SaveButton, StatusBadge, isConfirmed } from "@/components/person";
+import { Avatar, LinkedInLink, OPEN_TO_LABELS, PageTitle, SaveButton, StatusBadge, isConfirmed } from "@/components/person";
+import { formatDegree } from "@/lib/labels";
+import { FIELD_LABELS, SOURCE_LABELS } from "@/lib/provenance";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 import { addNote } from "./actions";
@@ -33,6 +36,7 @@ interface ProfileRow {
   metro: string | null;
   status: string;
   alumni_status: string;
+  claimed_by_user_id: string | null;
   photo_url: string | null;
   open_to: string[];
   specialties: string[];
@@ -52,30 +56,6 @@ const CONTACT_KINDS = [
   { kind: "linkedin", label: "LinkedIn" },
 ] as const;
 
-const SOURCE_LABELS: Record<string, string> = {
-  self: "Member-provided",
-  roster: "Alumni roster",
-  institution: "Wisconsin School of Business profile page",
-  web: "Public web",
-  pdl: "Licensed professional data",
-  ai: "AI-generated from the fields above",
-  admin: "Administrator",
-};
-
-const FIELD_LABELS: Record<string, string> = {
-  full_name: "Name",
-  current_title: "Current role",
-  current_organization_id: "Employer",
-  bio: "Biography",
-  photo_url: "Photo",
-  educations: "UW–Madison education",
-  alumni_status: "Alumni status",
-  location: "Location",
-  industry_id: "Industry",
-  linkedin: "LinkedIn link",
-  ai_summary: "Summary",
-};
-
 const year = (date: string | null) => (date ? date.slice(0, 4) : null);
 
 function visibilityNote(point: ContactPoint) {
@@ -88,8 +68,9 @@ function visibilityNote(point: ContactPoint) {
   return `${reason} · ${SOURCE_LABELS[point.source] ?? point.source}`;
 }
 
-async function Profile({ params }: { params: PageProps<"/people/[id]">["params"] }) {
+async function Profile({ params, searchParams }: { params: PageProps<"/people/[id]">["params"]; searchParams: PageProps<"/people/[id]">["searchParams"] }) {
   const { id } = await params;
+  const { claimed: justClaimed } = await searchParams;
   const viewer = await requireMember(`/people/${id}`);
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
@@ -98,7 +79,7 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
     supabase
       .from("people")
       .select(
-        "id, full_name, first_name, headline, bio, ai_summary, current_title, city, state, metro, status, alumni_status, photo_url, open_to, specialties, " +
+        "id, full_name, first_name, headline, bio, ai_summary, current_title, city, state, metro, status, alumni_status, claimed_by_user_id, photo_url, open_to, specialties, " +
           "organizations:current_organization_id(name), industries:industry_id(name), " +
           "educations(id, school, degree, major, grad_year), " +
           "positions(id, title, organization_name, is_current, start_date, end_date), " +
@@ -120,24 +101,45 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
   const confirmed = isConfirmed(person.status);
   const firstName = person.first_name ?? person.full_name.split(" ")[0];
   const market = person.metro ?? (person.city ? [person.city, person.state].filter(Boolean).join(", ") : null);
-  const educations = [...person.educations].sort((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999));
+  // Skip empty education rows (no degree, major or year): they carry no information.
+  const educations = person.educations
+    .filter((e) => e.degree || e.major || e.grad_year)
+    .sort((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999));
   const firstYear = educations.find((e) => e.grad_year)?.grad_year;
+  // Main job first (the one in their headline), then other current roles, then past jobs, newest first.
+  const isMain = (p: ProfileRow["positions"][number]) =>
+    p.is_current && p.title === person.current_title && (!person.organizations || p.organization_name === person.organizations.name);
   const positions = [...person.positions].sort(
-    (a, b) => Number(b.is_current) - Number(a.is_current) || (b.start_date ?? "").localeCompare(a.start_date ?? ""),
+    (a, b) =>
+      Number(isMain(b)) - Number(isMain(a)) ||
+      Number(b.is_current) - Number(a.is_current) ||
+      (b.start_date ?? "").localeCompare(a.start_date ?? ""),
   );
+  // Some listings give only a role or only an employer, which isn't enough for a
+  // position record; show what's known as the current entry instead.
+  const currentOnlyOnProfile =
+    positions.length === 0 && (person.current_title || person.organizations?.name)
+      ? { title: person.current_title ?? "Role not listed", organization: person.organizations?.name ?? "Employer not listed" }
+      : null;
   const groups = person.group_memberships.map((m) => m.groups).filter((g): g is { slug: string; name: string } => Boolean(g));
   const bioSource = person.field_provenance.find((p) => p.field === "bio");
+  const linkedin = person.contact_points.find((p) => p.kind === "linkedin");
 
   return (
     <>
-      <PageTitle
-        eyebrow="Discover / Alumni profile"
-        action={
-          <Link className="btn quiet" href="/search">
-            <Icon name="back" /> Back to search
-          </Link>
-        }
-      />
+      <BackToSearch />
+      <PageTitle eyebrow="Discover / Alumni profile" />
+      {justClaimed === "1" && person.claimed_by_user_id === viewer.userId && (
+        <div className="notice success" role="status" style={{ marginBottom: 24 }}>
+          <Icon name="check" />
+          <div>
+            <p>
+              <strong>This is now your profile.</strong> It shows as confirmed to other members. Review the details below; anything you
+              change replaces what came from public sources.
+            </p>
+          </div>
+        </div>
+      )}
       <section className="profile-heading" style={{ marginBottom: 32 }}>
         <Avatar name={person.full_name} photoUrl={person.photo_url} confirmed={confirmed} size="large" />
         <div className="identity">
@@ -148,14 +150,16 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
           </p>
           <p className="small muted" style={{ marginTop: 8 }}>
             <Icon name="pin" /> {market ?? "Location not provided"}
-            {firstYear && (
+            {person.alumni_status !== "not_alumnus" && (
               <>
-                <span style={{ padding: "0 8px" }}>·</span>Wisconsin ’{String(firstYear).slice(-2)}
+                <span style={{ padding: "0 8px" }}>·</span>
+                <Icon name="calendar" /> {firstYear ? `UW–Madison, Class of ${firstYear}` : "UW–Madison · class year not confirmed"}
               </>
             )}
           </p>
         </div>
         <div className="od-cluster">
+          {linkedin && <LinkedInLink name={person.full_name} url={linkedin.value} withText />}
           <SaveButton personId={person.id} name={person.full_name} saved={Boolean(saved)} withText />
         </div>
       </section>
@@ -168,7 +172,7 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
                 <h2>At a glance</h2>
                 <span className="chip ai">AI-generated summary</span>
               </div>
-              <ul style={{ paddingLeft: 20, color: "var(--fg-2)", marginBottom: 0 }}>
+              <ul className="glance-list">
                 {person.ai_summary.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -198,12 +202,26 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
                   <div>
                     <h3>{p.title}</h3>
                     <p>
-                      {p.organization_name} · {p.is_current ? "Current" : [year(p.start_date), year(p.end_date)].filter(Boolean).join("–") || "Past"}
+                      {p.organization_name} ·{" "}
+                      {p.is_current
+                        ? p.start_date
+                          ? `${year(p.start_date)}–present`
+                          : "Current"
+                        : [year(p.start_date), year(p.end_date)].filter(Boolean).join("–") || "Past"}
                     </p>
                   </div>
                 </div>
               ))}
-              {positions.length === 0 && (
+              {currentOnlyOnProfile && (
+                <div className="timeline-item">
+                  <span className="timeline-dot" />
+                  <div>
+                    <h3>{currentOnlyOnProfile.title}</h3>
+                    <p>{currentOnlyOnProfile.organization} · Current</p>
+                  </div>
+                </div>
+              )}
+              {positions.length === 0 && !currentOnlyOnProfile && (
                 <div className="timeline-item">
                   <span className="timeline-dot" />
                   <div>
@@ -220,9 +238,8 @@ async function Profile({ params }: { params: PageProps<"/people/[id]">["params"]
                     {educations.length ? (
                       educations.map((e) => (
                         <p key={e.id}>
-                          {[e.degree, e.major].filter(Boolean).join(", ")}
-                          {e.grad_year ? ` · Class of ${e.grad_year}` : ""}
-                          {e.school ? ` · ${e.school}` : ""}
+                          <strong className="grad-year">{e.grad_year ? `Class of ${e.grad_year}` : "Class year not confirmed"}</strong>
+                          {[formatDegree(e.degree, e.major), e.school].filter(Boolean).map((part) => ` · ${part}`)}
                         </p>
                       ))
                     ) : (
@@ -411,10 +428,10 @@ function ProfileSkeleton() {
   );
 }
 
-export default function PersonPage({ params }: PageProps<"/people/[id]">) {
+export default function PersonPage({ params, searchParams }: PageProps<"/people/[id]">) {
   return (
     <Suspense fallback={<ProfileSkeleton />}>
-      <Profile params={params} />
+      <Profile params={params} searchParams={searchParams} />
     </Suspense>
   );
 }

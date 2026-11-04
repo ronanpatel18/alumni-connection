@@ -22,3 +22,10 @@ export async function groupCues(db: SupabaseClient, personIds: string[]): Promis
   }
   return cues;
 }
+
+/** Each person's LinkedIn profile URL, where it's visible to this member (contact visibility applies). */
+export async function linkedinUrls(db: SupabaseClient, personIds: string[]): Promise<Map<string, string>> {
+  if (!personIds.length) return new Map();
+  const { data } = await db.from("contact_points").select("person_id, value").eq("kind", "linkedin").in("person_id", personIds);
+  return new Map((data ?? []).map((row) => [row.person_id as string, row.value as string]));
+}

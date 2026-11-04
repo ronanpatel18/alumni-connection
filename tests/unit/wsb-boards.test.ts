@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { groupFor, normalizeSnapshot, seniorityFor, snapshotSchema, splitName } from "@/lib/importers/wsb-boards";
+import { groupFor, isSuppressed, normalizeSnapshot, seniorityFor, snapshotSchema, splitName } from "@/lib/importers/wsb-boards";
 
 const snapshot = snapshotSchema.parse(JSON.parse(readFileSync("data/sources/wsb-advisory-boards-2026-11-03.json", "utf8")));
 const members = normalizeSnapshot(snapshot);
@@ -36,5 +36,21 @@ describe("WSB advisory board import", () => {
     expect(toney.organizationName).toBeNull();
     expect(toney.alumniStatus).toBe("likely");
     expect(toney.externalId).toBe("alumni-board/stephanie-toney");
+  });
+});
+
+describe("isSuppressed", () => {
+  const hammes = members.find((m) => m.fullName === "Patrick Hammes")!;
+
+  it("matches a removal by the listing's own ID", () => {
+    expect(isSuppressed(hammes, [{ full_name: "Patrick Hammes", source: "wsb-advisory-boards", external_id: hammes.externalId }])).toBe(true);
+  });
+
+  it("doesn't block a different person who shares the name", () => {
+    expect(isSuppressed(hammes, [{ full_name: "Patrick Hammes", source: "wsb-advisory-boards", external_id: "someone-else" }])).toBe(false);
+  });
+
+  it("falls back to the name for requests without a source ID", () => {
+    expect(isSuppressed(hammes, [{ full_name: "patrick hammes ", source: null, external_id: null }])).toBe(true);
   });
 });

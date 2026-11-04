@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Brand } from "@/components/brand";
 import { Icon } from "@/components/icon";
+import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/viewer";
 
 export const metadata: Metadata = { title: "Verification pending" };
@@ -11,6 +12,12 @@ async function PendingStatus() {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
   if (viewer.isVerified) redirect("/discover");
+  const supabase = await createClient();
+  const { count: pendingClaims } = await supabase
+    .from("claim_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", viewer.userId)
+    .eq("status", "pending");
 
   return (
     <section className="panel pad">
@@ -21,13 +28,25 @@ async function PendingStatus() {
         </span>
         <span className="small muted">{viewer.email}</span>
       </div>
-      <div className="notice" role="status">
-        <Icon name="info" />
-        <div>
-          <p>We couldn’t automatically match your email to an alumni record yet.</p>
-          <p>If we already have a profile for you, you’ll be able to claim it. Otherwise an administrator reviews your request.</p>
+      {pendingClaims ? (
+        <div className="notice success" role="status">
+          <Icon name="check" />
+          <div>
+            <p>
+              <strong>We received your request to claim your profile.</strong>
+            </p>
+            <p>Your email isn’t on file for that profile, so an administrator will confirm it’s you before giving access.</p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="notice" role="status">
+          <Icon name="info" />
+          <div>
+            <p>We couldn’t automatically match your email to an alumni record yet.</p>
+            <p>If you received an invitation link, open it to claim your profile. Otherwise an administrator reviews your request.</p>
+          </div>
+        </div>
+      )}
       {process.env.NODE_ENV === "development" && (
         <div className="notice" style={{ marginTop: 16 }}>
           <Icon name="settings" />

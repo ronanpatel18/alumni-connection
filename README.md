@@ -49,7 +49,16 @@ Load the first real people, the Wisconsin School of Business advisory boards
 npm run import:wsb-boards
 ```
 
-Then:
+Then open http://127.0.0.1:3000. With `DEV_AUTO_LOGIN_EMAIL=admin@wisc.edu`
+in `.env.local` (the default in `.env.example`), you're signed in automatically
+as a verified administrator and land on the full directory (`/search`); the
+account is created on first visit. Typing admin@wisc.edu on `/login` also skips
+the inbox. This only
+works under `npm run dev` against a local Supabase, and production builds
+ignore it. Signing out takes you to `/login`; open any member page to be signed
+back in.
+
+To test the real sign-in instead, remove that line, restart `npm run dev`, and:
 
 1. Open http://127.0.0.1:3000/login and request a sign-in link.
 2. Open the local inbox at http://127.0.0.1:54324 and click the link.
@@ -59,10 +68,46 @@ Then:
    npm run dev:promote -- you@example.com admin
    ```
 
-4. Search at http://127.0.0.1:3000/search. Use the **Group** filter to see each board.
+Search at http://127.0.0.1:3000/search. Use the **Group** filter to see each board.
 
 `npm run db:reset` rebuilds the database from the migrations. It holds no fake
 people; the 5,000 synthetic alumni in `tests/db/fixtures/` are only used by tests.
+
+### Claim or remove a profile
+
+There's no public name search, so the directory never reveals who's in it.
+Each person gets a **private link** (`/claim/<token>`, `/remove/<token>`) for
+their invitation email:
+
+```bash
+npm run links:generate -- --group wisconsin-business-alumni-board
+```
+
+- **Claim:** the person signs in by email. If that email is on file for the
+  profile, it's linked and they're verified at once; otherwise the claim waits
+  for an administrator.
+- **Remove:** one step, no account. The profile and everything derived from it
+  is deleted; a minimal suppression record (keyed to the source listing) stops
+  imports from re-adding them.
+
+Only a SHA-256 of each token is stored. The CSV holds the real links, so treat
+it like a password file.
+
+### Profile & privacy (members with a claimed profile)
+
+`/me` (sidebar: **Profile & privacy**) has three tabs:
+
+- **Edit profile:** name, role, employer, city, industry, UW degree and class
+  year, what they're open to, and a short bio. A new role moves the old one to
+  history.
+- **Privacy & visibility:** email, phone, website and LinkedIn, each shown to
+  all verified members, connections only, or no one. Changing an email clears
+  its verified label until it's checked again.
+- **Data sources:** where each field came from.
+
+Member edits are recorded as source `self` and always win over imported or AI
+data. "Leave the network" deletes the profile the same way a remove link does,
+then signs the member out.
 
 ### Enrichment (UW degrees, class year, location, industry)
 
@@ -70,12 +115,83 @@ people; the 5,000 synthetic alumni in `tests/db/fixtures/` are only used by test
 npm run enrich -- --group wsb-external-advisory-board
 ```
 
-Uses a **free** model picked from [models.dev](https://models.dev): DeepSeek V4.1
-Flash on NVIDIA's API. Get a free key at https://build.nvidia.com and set the
-`AI_MODE=live` block shown in `.env.example`. Optional: a free Tavily key
+Uses Google Gemini's **free tier** (`gemini-3.1-flash-lite`, about 1s a call): create a
+key at https://aistudio.google.com/apikey, paste it into `GEMINI_API_KEY` in
+`.env.local`, and set the `gemini` provider (see `.env.example`). The free tier
+limits requests per minute; batch scripts wait and retry. Optional: a free Tavily key
 (`TAVILY_API_KEY`) adds web search for people without a bio. Every saved fact
 must quote its source word for word (checked in `lib/enrichment/verify.ts`);
 anything the model can't back up is dropped. Add `--dry-run` to preview.
+
+### Web search (self-hosted SearXNG, free)
+
+```bash
+npm run search:start   # SearXNG in Docker at http://127.0.0.1:8888 (this machine only)
+npm run search:stop
+```
+
+Enrichment searches the web through a self-hosted [SearXNG](https://docs.searxng.org)
+metasearch engine: no key, no cost. Config is in `searxng/`; the first start
+writes a random secret to `searxng/.env` (git-ignored). Each search goes to one
+engine, rotating through Yahoo, Bing, Brave, Google CSE and Qwant
+(`SEARXNG_ENGINES`), and each engine gets at most one search every 6 seconds
+(`SEARXNG_GAP_MS`), because engines suspend clients that search fast. Class-year
+runs work on 5 people at once (`--concurrency`) and only download pages whose
+title or snippet looks relevant. Tavily still works as an opt-in alternative:
+`SEARCH_PROVIDER=tavily` with `TAVILY_API_KEY`, or `--tavily` on `class-years`.
+
+### Class years
+
+```bash
+npm run class-years            # dry run: prints each year with its quote and link
+npm run class-years -- --write # saves them
+```
+
+For people still missing a class year, reads explicit statements only ("BBA
+'94", "class of 1998", "graduated from UW–Madison in 1991", a LinkedIn
+"1993 – 1997" education line). Sources, free ones first:
+
+1. Their stored bio and Wikidata.
+2. **UW–Madison's own sites** through their built-in site search, no key and no
+   cost: business.wisc.edu, news.wisc.edu, On Wisconsin (onwisconsin.uwalumni.com),
+   supportuw.org and engineering.wisc.edu. These write alumni as "Name (BBA '94)".
+3. **Wikipedia** search and article text.
+4. Three web searches a person through SearXNG (or Tavily with `--tavily`).
+
+Requests go one at a time per site with a pause, back off on "too many
+requests", and are cached for a week in `data/private/`. A year counts only when
+it's attached to this person's own name (not a spouse's or a namesake's) or the
+page is about them. It skips honorary degrees, relatives' degrees, other UW
+campuses, name lists such as commencement programs, and conflicting sources;
+nothing is estimated. Years a member or administrator entered are never changed.
+
+### LinkedIn
+
+```bash
+npm run linkedin            # dry run: what it would change, per person
+npm run linkedin -- --write # saves it
+```
+
+Works the way wsbcconnect did: through LinkedIn's public search snippets (via
+SearXNG, or Tavily), never by fetching or scraping LinkedIn (that breaks LinkedIn's terms).
+For each unclaimed profile it finds the LinkedIn URL if missing (wsbcconnect's
+"Name Title Company linkedin" search and scoring, plus: the result's title must
+carry their first and last name and it must mention their employer), then reads
+the snippet for location, dated work history and UW–Madison degrees. When
+LinkedIn shows the listed job has ended, the current role moves to the newer
+one. Snippets are cached for a week in `data/private/`, so a dry run and the
+saving run use the free search quota once. Profiles show a LinkedIn icon by the
+name and a "Connect on LinkedIn" button, as on wsbcconnect.
+
+### Administration (`/admin`, administrators only)
+
+- **Profile review:** unclaimed profiles with a missing class year, unconfirmed
+  UW degree, incomplete role, or missing location or industry, most gaps
+  first. Each review page shows the profile's sources and research links; the
+  administrator corrects what a source supports and leaves a note. Corrections
+  are recorded as source "Administrator", and re-imports leave them alone.
+- **Claim requests:** claims whose sign-in email isn't on file. Approving links
+  the profile and verifies the member; every decision goes in the audit log.
 
 ### AI in development
 
@@ -115,9 +231,13 @@ npm run inngest:dev
 | `npm run inngest:dev` | Inngest dev server for background jobs |
 | `npm run dev:promote -- <email> [role]` | Local only: set a member's role |
 | `npm run dev:summaries -- [limit]` | Local only: write AI summaries + embeddings |
+| `npm run links:generate -- [--group slug]` | Create private claim/remove links for invitation emails (git-ignored CSV in `data/private/`) |
 | `npm run design:sync` | After re-exporting from Open Design: regenerate the app's copy of the design's component CSS |
 | `npm run import:wsb-boards` | Import WSB advisory-board members from `data/sources/` |
 | `npm run enrich -- [--group slug] [--concurrency N] [--dry-run]` | Extract degrees, location and industry from bios and web search |
+| `npm run class-years -- [--write] [--names "A,B"] [--no-search] [--tavily]` | Find missing class years from stated sources (dry run unless `--write`) |
+| `npm run search:start` / `search:stop` | Start or stop the self-hosted SearXNG search engine (Docker) |
+| `npm run linkedin -- [--write] [--names "A,B"]` | LinkedIn URL, location, work history and UW degrees from search snippets (dry run unless `--write`) |
 
 ## Project layout
 
@@ -151,11 +271,10 @@ running the app against local Supabase (needs Docker).
   industry, radius, class-year and open-to filters, a free-text parser,
   confirmed vs. unconfirmed counts, breakdowns by industry and metro, profile
   pages with per-detail contact visibility, saved contacts, private notes, and
-  the AI-summary background job.
+  the AI-summary background job, the advisory-board import with web
+  enrichment, claim-or-remove links, profile editing and privacy settings, and the admin
+  review queue (profile review and claim requests).
 - Still to build:
   - Roster CSV import.
   - Enrichment pipeline v1 (People Data Labs + web verification).
-  - Claim-your-profile and "remove me" flows.
-  - Profile editing and privacy settings UI.
-  - Admin review queue.
   - Full GeoNames city table.

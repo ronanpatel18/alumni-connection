@@ -1,5 +1,4 @@
-import type { Metadata } from "next";
-import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,13 +7,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const viewport: Viewport = { colorScheme: "light" };
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  // Light mode only: data-theme="light" switches off the design tokens' dark
+  // values (they apply only to :root:not([data-theme=light])).
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        {/* Apply a stored light/dark choice before first paint. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
+    <html lang="en" data-theme="light">
       <body>{children}</body>
     </html>
   );

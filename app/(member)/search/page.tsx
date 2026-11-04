@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AutoSubmit } from "@/components/auto-submit";
+import { RememberSearch } from "@/components/back-to-search";
 import { Icon } from "@/components/icon";
 import { EmptyState, OPEN_TO_LABELS, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
 import { getAi } from "@/lib/ai";
-import { groupCues, savedIds } from "@/lib/people";
+import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 import { parseSearchText } from "@/lib/search/parse-query";
 import { getVocabulary } from "@/lib/search/vocabulary";
@@ -207,7 +208,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
   const people = (results.data ?? []) as PersonSummary[];
   const f = facets.data as Facets;
   const ids = people.map((p) => p.id);
-  const [saved, cues] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids)]);
+  const [saved, cues, linkedin] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids), linkedinUrls(supabase, ids)]);
   const totalPages = Math.max(1, Math.ceil(f.total / PAGE_SIZE));
 
   const place = places.find((p) => p.id === placeId);
@@ -257,7 +258,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
           {people.length ? (
             <>
               {people.map((person) => (
-                <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} />
+                <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
               ))}
               <div className="pagination">
                 <span>
@@ -346,6 +347,7 @@ function ResultsSkeleton() {
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
     <>
+      <RememberSearch />
       <PageTitle
         eyebrow="Discover / Search"
         title="Find your people."

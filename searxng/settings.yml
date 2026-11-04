@@ -1,0 +1,42 @@
+# SearXNG settings for local use by Alumni Connect. Only what differs from
+# SearXNG's defaults is listed (use_default_settings keeps the rest).
+use_default_settings: true
+
+general:
+  instance_name: "Alumni Connect search (local)"
+
+server:
+  # Overridden by SEARXNG_SECRET from searxng/.env.
+  secret_key: "set-by-environment"
+  # Only this machine uses it, so no bot limiter (it needs Redis).
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  # JSON lets the app read results; HTML keeps the web page usable for people.
+  formats:
+    - html
+    - json
+  # When an engine pushes back, bench it for minutes rather than SearXNG's
+  # default of up to a day; the app also paces its queries (lib/enrichment/search.ts).
+  suspended_times:
+    SearxEngineAccessDenied: 600
+    SearxEngineCaptcha: 600
+    SearxEngineTooManyRequests: 300
+    cf_SearxEngineCaptcha: 600
+    cf_SearxEngineAccessDenied: 600
+    recaptcha_SearxEngineCaptcha: 600
+
+# General-web engines the app rotates through (see SEARXNG_ENGINES). This
+# SearXNG version has no Startpage or Mojeek engine; these are the ones it has.
+engines:
+  - name: bing
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: yahoo
+    disabled: false
+
+ui:
+  query_in_title: false

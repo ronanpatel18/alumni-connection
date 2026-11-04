@@ -10,6 +10,7 @@ const PATHS = {
   chevron: '<path d="m9 5 7 7-7 7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   save: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+  linkedin: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10.5V17M8 7.25v.01M12 17v-6.5m0 3a2.5 2.5 0 0 1 5 0V17"/>',
   pin: '<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/>',
   intro: '<circle cx="5" cy="12" r="3"/><circle cx="19" cy="6" r="3"/><circle cx="19" cy="18" r="3"/><path d="m8 11 8-4m-8 6 8 4"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18M7 14h3m4 0h3m-10 3h3"/>',

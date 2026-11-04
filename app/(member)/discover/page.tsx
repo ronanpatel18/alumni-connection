@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Icon } from "@/components/icon";
 import { EmptyState, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
-import { groupCues, savedIds } from "@/lib/people";
+import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 
@@ -19,7 +19,7 @@ async function StartingPoints() {
   if (error) throw error;
   const people = (data ?? []) as PersonSummary[];
   const ids = people.map((p) => p.id);
-  const [saved, cues] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids)]);
+  const [saved, cues, linkedin] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids), linkedinUrls(supabase, ids)]);
 
   if (!people.length) {
     return <EmptyState title="No profiles yet" text="Import a roster or a board listing to start the directory." />;
@@ -27,7 +27,7 @@ async function StartingPoints() {
   return (
     <>
       {people.map((person) => (
-        <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} />
+        <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
       ))}
     </>
   );

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Brand } from "./brand";
 import { Icon, type IconName } from "./icon";
-import { ThemeToggle } from "./theme-toggle";
 
 // Only areas that exist today. Trips, Insights and Administration join this list
 // as they're built (their prototypes are in design/prototypes/screens).
@@ -13,16 +12,41 @@ const NAV: { href: string; label: string; icon: IconName; matches: string[] }[] 
   { href: "/discover", label: "Discover", icon: "search", matches: ["/discover", "/search", "/people"] },
   { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved"] },
 ];
+const UTILITY_NAV = { href: "/me", label: "Profile & privacy", icon: "settings" as const, matches: ["/me"] };
+// Shown only to administrators (the layout passes <AdminNavItem /> for them).
+const ADMIN_NAV = { href: "/admin", label: "Administration", icon: "admin" as const, matches: ["/admin"] };
+
+const isActive = (pathname: string, matches: string[]) => matches.some((m) => pathname === m || pathname.startsWith(`${m}/`));
+
+export function AdminNavItem() {
+  const pathname = usePathname();
+  return (
+    <Link className="nav-item" href={ADMIN_NAV.href} aria-current={isActive(pathname, ADMIN_NAV.matches) ? "page" : undefined}>
+      <Icon name={ADMIN_NAV.icon} />
+      <span>{ADMIN_NAV.label}</span>
+    </Link>
+  );
+}
 
 /**
  * Member workspace chrome from the design: persistent sidebar on desktop,
  * sticky top bar with a labeled menu control on phones (Escape closes it).
  */
-export function AppFrame({ account, savedCount, children }: { account: ReactNode; savedCount: ReactNode; children: ReactNode }) {
+export function AppFrame({
+  account,
+  savedCount,
+  admin,
+  children,
+}: {
+  account: ReactNode;
+  savedCount: ReactNode;
+  admin: ReactNode;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
-  const active = NAV.find((item) => item.matches.some((m) => pathname === m || pathname.startsWith(`${m}/`)));
+  const active = [...NAV, ADMIN_NAV, UTILITY_NAV].find((item) => isActive(pathname, item.matches));
 
   // Close the mobile menu after navigating.
   const [lastPath, setLastPath] = useState(pathname);
@@ -59,6 +83,7 @@ export function AppFrame({ account, savedCount, children }: { account: ReactNode
                 {item.href === "/saved" && <span className="nav-count">{savedCount}</span>}
               </Link>
             ))}
+            {admin}
           </nav>
           <div className="sidebar-bottom">
             <div className="chapter-note">
@@ -66,6 +91,12 @@ export function AppFrame({ account, savedCount, children }: { account: ReactNode
               <p>A nationwide network of Wisconsin alumni, built on real relationships.</p>
               <Link className="small" href="/search">
                 Find your next connection <Icon name="arrow" />
+              </Link>
+            </div>
+            <div>
+              <Link className="nav-item" href={UTILITY_NAV.href} aria-current={active === UTILITY_NAV ? "page" : undefined}>
+                <Icon name={UTILITY_NAV.icon} />
+                <span>{UTILITY_NAV.label}</span>
               </Link>
             </div>
             {account}
@@ -84,7 +115,6 @@ export function AppFrame({ account, savedCount, children }: { account: ReactNode
                 <Icon name="lock" />
                 <span>Private. Verified alumni only.</span>
               </span>
-              <ThemeToggle />
               <button
                 ref={menuButton}
                 type="button"

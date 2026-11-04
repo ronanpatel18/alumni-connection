@@ -20,10 +20,29 @@ async function main() {
   if (error) throw error;
 
   let done = 0;
+  let failed = 0;
   for (const { id } of rows) {
     const loaded = await loadProfileFacts(db, id);
     if (!loaded) continue;
-    const summary = await ai.summarizeProfile(loaded.facts);
+    let summary;
+    try {
+      // Free tiers limit requests per minute: on a 429, wait a minute and retry (up to 3 times).
+      for (let attempt = 1; ; attempt++) {
+        try {
+          summary = await ai.summarizeProfile(loaded.facts);
+          break;
+        } catch (error) {
+          if (!/\b429\b/.test(String((error as Error).message)) || attempt >= 3) throw error;
+          console.warn(`  rate-limited; waiting 60s (attempt ${attempt}/2)`);
+          await new Promise((resolve) => setTimeout(resolve, 60_000));
+        }
+      }
+    } catch (error) {
+      // One slow or rate-limited answer shouldn't stop the rest; rerun to fill gaps.
+      failed++;
+      console.warn(`  skipped ${loaded.facts.fullName}: ${(error as Error).message.slice(0, 120)}`);
+      continue;
+    }
     const [embedding] = await ai.embed([embeddingText(loaded.facts, summary.summary)]);
     const { error: updateError } = await db
       .from("people")
@@ -33,7 +52,7 @@ async function main() {
     done++;
     if (done % 50 === 0) console.log(`${done}/${rows.length}`);
   }
-  console.log(`Summarized ${done} profiles.`);
+  console.log(`Summarized ${done} profiles${failed ? `; ${failed} skipped (run again to retry)` : ""}.`);
 }
 
 main().catch((error) => {

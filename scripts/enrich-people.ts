@@ -12,6 +12,8 @@ import type { EnrichmentSource } from "@/lib/ai/schemas";
 import { findLinkedInUrl, searchConfigured, searchPerson } from "@/lib/enrichment/search";
 import { type AlumniStatus, verifyEnrichment } from "@/lib/enrichment/verify";
 
+const CITY_ALIASES: Record<string, string> = { nyc: "New York", "new york city": "New York", la: "Los Angeles", sf: "San Francisco", dc: "Washington", "washington dc": "Washington", "washington, d.c.": "Washington" };
+
 const STATUS_RANK: Record<string, number> = { unknown: 0, not_alumnus: 1, likely: 2, source_stated: 3, confirmed: 4 };
 // NVIDIA's free tier allows ~40 requests/minute.
 const DELAY_MS = Number(process.env.ENRICH_DELAY_MS ?? 1600);
@@ -186,10 +188,12 @@ async function main() {
     const provenance: Record<string, unknown>[] = [];
 
     // Education: replace what earlier enrichment runs wrote; keep roster/self/admin rows.
-    if (verified.uwEducations.length) {
+    // An entry with no degree, major or year says nothing, so it isn't stored.
+    const uwEducations = verified.uwEducations.filter((e) => e.degree || e.major || e.gradYear);
+    if (uwEducations.length) {
       await db.from("educations").delete().eq("person_id", person.id).eq("verified_by", "source");
       await db.from("educations").insert(
-        verified.uwEducations.map((e) => ({
+        uwEducations.map((e) => ({
           person_id: person.id,
           institution_id: institution.id,
           school: /bba|mba|business/i.test(`${e.degree} ${e.major}`) ? "Wisconsin School of Business" : null,
@@ -199,7 +203,7 @@ async function main() {
           verified_by: "source",
         })),
       );
-      provenance.push({ field: "educations", sourceUrl: verified.uwEducations[0].sourceUrl, confidence: 0.9 });
+      provenance.push({ field: "educations", sourceUrl: uwEducations[0].sourceUrl, confidence: 0.9 });
     }
 
     const update: Record<string, unknown> = {};
@@ -214,10 +218,12 @@ async function main() {
     }
     if (verified.specialties.length && !person.specialties.length) update.specialties = verified.specialties;
     if (verified.location && !person.place_id) {
+      // Sources often abbreviate big cities ("NYC"); store the full name.
+      const city = CITY_ALIASES[verified.location.city.toLowerCase()] ?? verified.location.city;
       const cityKey = (name: string) => name.toLowerCase().replace(/\s+city$/, "").replace(/^saint\b/, "st.");
-      const place = places.find((p) => cityKey(p.name) === cityKey(verified.location!.city) && (!verified.location!.state || p.state === verified.location!.state));
+      const place = places.find((p) => cityKey(p.name) === cityKey(city) && (!verified.location!.state || p.state === verified.location!.state));
       if (place) update.place_id = place.id;
-      else Object.assign(update, { city: verified.location.city, state: verified.location.state });
+      else Object.assign(update, { city, state: verified.location.state });
       provenance.push({ field: "location", sourceUrl: verified.location.sourceUrl, confidence: 0.8 });
     }
     if (Object.keys(update).length) await db.from("people").update(update).eq("id", person.id);

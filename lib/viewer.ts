@@ -45,3 +45,10 @@ export async function requireMember(next = "/discover"): Promise<Viewer> {
   if (!viewer.isVerified) redirect("/pending");
   return viewer;
 }
+
+/** For administration pages: members who aren't administrators go to Discover. */
+export async function requireAdmin(next = "/admin"): Promise<Viewer> {
+  const viewer = await requireMember(next);
+  if (!viewer.isAdmin) redirect("/discover");
+  return viewer;
+}

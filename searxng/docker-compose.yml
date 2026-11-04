@@ -1,0 +1,21 @@
+# Self-hosted SearXNG: a free, keyless metasearch engine (it queries Google,
+# Bing, DuckDuckGo, Brave and others and merges the results). The app uses it
+# for web search instead of a paid API. Local development only: it listens on
+# 127.0.0.1, so nothing outside this machine can reach it.
+#
+#   npm run search:start   →  http://127.0.0.1:8888
+#   npm run search:stop
+name: alumni-connect-search
+services:
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    env_file:
+      - path: .env # SEARXNG_SECRET, created by npm run search:start (git-ignored)
+        required: false
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8888/
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro

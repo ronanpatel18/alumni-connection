@@ -55,6 +55,9 @@ function liveChatBackend(config: AiConfig, provider: ChatProvider, model: string
         apiKey: config.openAiCompatApiKey,
         model,
       });
+    case "gemini":
+      if (!config.geminiApiKey) throw new Error("GEMINI_API_KEY is required for the gemini provider");
+      return new OpenAiCompatibleBackend({ name: "gemini", baseURL: config.geminiBaseUrl, apiKey: config.geminiApiKey, model });
     case "anthropic":
       return new AnthropicBackend(model);
   }

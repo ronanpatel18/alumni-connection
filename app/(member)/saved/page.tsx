@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { EmptyState, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
-import { groupCues } from "@/lib/people";
+import { groupCues, linkedinUrls } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 
@@ -64,10 +64,8 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
   const matches = query
     ? people.filter((p) => [p.full_name, p.organization_name, p.city].filter(Boolean).join(" ").toLowerCase().includes(query))
     : people;
-  const cues = await groupCues(
-    supabase,
-    matches.map((p) => p.id),
-  );
+  const matchIds = matches.map((p) => p.id);
+  const [cues, linkedin] = await Promise.all([groupCues(supabase, matchIds), linkedinUrls(supabase, matchIds)]);
 
   if (!matches.length) {
     return (
@@ -85,7 +83,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
   return (
     <>
       {matches.map((person) => (
-        <PersonRow key={person.id} person={person} saved cue={cues.get(person.id)} />
+        <PersonRow key={person.id} person={person} saved cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
       ))}
     </>
   );

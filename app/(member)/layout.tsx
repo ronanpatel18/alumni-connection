@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AccountBlock, SavedCount } from "@/components/account-block";
+import { AccountBlock, AdminNav, SavedCount } from "@/components/account-block";
 import { AppFrame } from "@/components/app-frame";
 
 export default function MemberLayout({ children }: LayoutProps<"/">) {
@@ -10,6 +10,11 @@ export default function MemberLayout({ children }: LayoutProps<"/">) {
       account={
         <Suspense fallback={null}>
           <AccountBlock />
+        </Suspense>
+      }
+      admin={
+        <Suspense fallback={null}>
+          <AdminNav />
         </Suspense>
       }
       savedCount={

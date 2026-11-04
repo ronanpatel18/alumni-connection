@@ -4,16 +4,16 @@
 import { z } from "zod";
 
 export type AiMode = "fixture" | "live" | "record";
-export type ChatProvider = "ollama" | "openai-compatible" | "anthropic";
+export type ChatProvider = "ollama" | "openai-compatible" | "gemini" | "anthropic";
 export type EmbedProvider = "ollama" | "openai-compatible" | "fixture";
 /** `extract` = short structured jobs (summaries, query parsing); `write` = prose (explanations, outreach). */
 export type AiTaskKind = "extract" | "write";
 
 const envSchema = z.object({
   AI_MODE: z.enum(["fixture", "live", "record"]).default("fixture"),
-  AI_EXTRACT_PROVIDER: z.enum(["ollama", "openai-compatible", "anthropic"]).default("ollama"),
+  AI_EXTRACT_PROVIDER: z.enum(["ollama", "openai-compatible", "gemini", "anthropic"]).default("ollama"),
   AI_EXTRACT_MODEL: z.string().default("gpt-oss:20b"),
-  AI_WRITE_PROVIDER: z.enum(["ollama", "openai-compatible", "anthropic"]).default("ollama"),
+  AI_WRITE_PROVIDER: z.enum(["ollama", "openai-compatible", "gemini", "anthropic"]).default("ollama"),
   AI_WRITE_MODEL: z.string().default("gpt-oss:20b"),
   AI_EMBED_PROVIDER: z.enum(["ollama", "openai-compatible", "fixture"]).default("ollama"),
   AI_EMBED_MODEL: z.string().default("bge-m3"),
@@ -23,6 +23,9 @@ const envSchema = z.object({
   OLLAMA_BASE_URL: z.string().url().default("http://127.0.0.1:11434/v1"),
   OPENAI_COMPAT_BASE_URL: z.string().url().optional(),
   OPENAI_COMPAT_API_KEY: z.string().optional(),
+  // Google Gemini through its OpenAI-compatible endpoint (free tier: a key from aistudio.google.com).
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai/"),
 });
 
 export interface AiConfig {
@@ -33,6 +36,8 @@ export interface AiConfig {
   ollamaBaseUrl: string;
   openAiCompatBaseUrl: string | undefined;
   openAiCompatApiKey: string | undefined;
+  geminiApiKey: string | undefined;
+  geminiBaseUrl: string;
 }
 
 export function loadAiConfig(env: Record<string, string | undefined> = process.env): AiConfig {
@@ -49,5 +54,7 @@ export function loadAiConfig(env: Record<string, string | undefined> = process.e
     ollamaBaseUrl: e.OLLAMA_BASE_URL,
     openAiCompatBaseUrl: e.OPENAI_COMPAT_BASE_URL,
     openAiCompatApiKey: e.OPENAI_COMPAT_API_KEY,
+    geminiApiKey: e.GEMINI_API_KEY,
+    geminiBaseUrl: e.GEMINI_BASE_URL,
   };
 }

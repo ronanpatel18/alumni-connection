@@ -6,7 +6,7 @@
 // Usage: npm run import:wsb-boards -- [path/to/snapshot.json] [--remote]
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { normalizeSnapshot, type NormalizedMember, PARENT_UNIT, SOURCE, snapshotSchema } from "@/lib/importers/wsb-boards";
+import { isSuppressed, normalizeSnapshot, type NormalizedMember, PARENT_UNIT, SOURCE, snapshotSchema } from "@/lib/importers/wsb-boards";
 
 const DEFAULT_SNAPSHOT = "data/sources/wsb-advisory-boards-2026-11-03.json";
 const INSTITUTION_SLUG = "uw-madison";
@@ -53,12 +53,24 @@ async function upsertPerson(db: SupabaseClient, institutionId: string, member: N
 
   let personId: string;
   let created = false;
+  let protectedRole = false;
   if (link) {
     personId = link.person_id;
     const person = must(await db.from("people").select("status").eq("id", personId).single(), "load person");
-    // Once someone claims their profile, their own edits win over the listing.
+    // Once someone claims their profile, their own edits win over the listing,
+    // and fields an administrator corrected in review are left alone.
     if (person.status === "seeded") {
-      maybe(await db.from("people").update(listingFields).eq("id", personId), "update person");
+      const newer = (maybe(
+        await db.from("field_provenance").select("field, source").eq("person_id", personId).in("source", ["admin", "web"]),
+        "load reviewed fields",
+      ) ?? []) as { field: string; source: string }[];
+      const reviewed = new Set(newer.filter((r) => r.source === "admin").map((r) => r.field));
+      // A role an administrator corrected, or one LinkedIn shows is newer than the listing, stays.
+      protectedRole = newer.some((r) => r.field === "current_title" || r.field === "current_organization_id");
+      const update: Record<string, unknown> = { ...listingFields };
+      if (reviewed.has("full_name")) for (const k of ["full_name", "first_name", "last_name"]) delete update[k];
+      if (protectedRole) for (const k of ["current_title", "current_organization_id", "headline", "seniority"]) delete update[k];
+      maybe(await db.from("people").update(update).eq("id", personId), "update person");
     }
   } else {
     const inserted = must(
@@ -77,7 +89,7 @@ async function upsertPerson(db: SupabaseClient, institutionId: string, member: N
     );
   }
 
-  if (member.title && member.organizationName) {
+  if (member.title && member.organizationName && !protectedRole) {
     const current = must(
       await db.from("positions").select("id").eq("person_id", personId).eq("is_current", true).eq("title", member.title).eq("organization_name", member.organizationName),
       "find position",
@@ -121,10 +133,9 @@ async function main() {
   const db = createClient(url, process.env.SUPABASE_SECRET_KEY ?? "", { auth: { persistSession: false } });
 
   const institution = must(await db.from("institutions").select("id").eq("slug", INSTITUTION_SLUG).single(), "load institution");
-  const suppressed = new Set(
-    must(await db.from("suppression_list").select("full_name").eq("institution_id", institution.id), "load suppression list").map((r) =>
-      r.full_name.toLowerCase(),
-    ),
+  const suppressed = must(
+    await db.from("suppression_list").select("full_name, source, external_id").eq("institution_id", institution.id),
+    "load suppression list",
   );
 
   const groupIds = new Map<string, string>();
@@ -147,7 +158,7 @@ async function main() {
   let updated = 0;
   let skipped = 0;
   for (const member of members) {
-    if (suppressed.has(member.fullName.toLowerCase())) {
+    if (isSuppressed(member, suppressed)) {
       skipped++;
       continue;
     }

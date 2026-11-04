@@ -122,3 +122,23 @@ export function normalizeSnapshot(snapshot: BoardSnapshot): NormalizedMember[] {
     .filter((m) => m.organization?.trim().toLowerCase() !== "in memoriam")
     .map((m) => normalizeMember(m, snapshot.source));
 }
+
+export interface SuppressionRow {
+  full_name: string;
+  source: string | null;
+  external_id: string | null;
+}
+
+/**
+ * True if this member asked to be removed. A record with a source ID matches only
+ * that exact listing (so a different person with the same name isn't blocked);
+ * name-only records (e.g. from an emailed request) match by name.
+ */
+export function isSuppressed(member: Pick<NormalizedMember, "externalId" | "fullName">, rows: SuppressionRow[]): boolean {
+  const name = member.fullName.trim().toLowerCase();
+  return rows.some((row) =>
+    row.source && row.external_id
+      ? row.source === SOURCE && row.external_id === member.externalId
+      : row.full_name.trim().toLowerCase() === name,
+  );
+}

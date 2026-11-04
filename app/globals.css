@@ -51,10 +51,74 @@
   white-space: pre-line;
   color: var(--fg-2);
 }
+/* Profile timeline: a red line joins each dot to the next one. The timeline's
+   row gap is 24px and each dot's center sits 12px below its item's top. */
+.timeline-item {
+  position: relative;
+}
+.timeline-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 12px;
+  bottom: -36px;
+  width: 2px;
+  background: var(--accent);
+}
+.timeline-dot {
+  position: relative;
+  z-index: 1;
+}
+.grad-year {
+  color: var(--fg);
+  font-weight: 600;
+}
+/* "Back to search" sits at the top left, its text aligned with the page edge. */
+.back-link {
+  margin: -12px 0 16px -8px;
+}
+/* Tailwind's reset zeroes every margin, which pins native modal dialogs to the
+   top-left corner; restore the browser's centering. */
+dialog {
+  margin: auto;
+}
 /* The prototype hides the account block on phones; keep it (and Sign out)
    reachable inside the open menu. */
 @media (max-width: 767px) {
   .app.menu-open .account {
     display: flex;
   }
+}
+/* Admin review: each degree is its own bordered group. */
+.edu-row {
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+/* LinkedIn icon beside a name (as on wsbcconnect's attendee cards). */
+.linkedin-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+.linkedin-link:hover,
+.linkedin-link:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+/* "At a glance": Tailwind's reset removes list markers, so restore the bullets. */
+.glance-list {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 0;
+  color: var(--fg-2);
+  display: grid;
+  gap: 8px;
+}
+.glance-list li::marker {
+  color: var(--accent);
 }

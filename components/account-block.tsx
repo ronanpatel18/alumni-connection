@@ -1,3 +1,4 @@
+import { AdminNavItem } from "@/components/app-frame";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/viewer";
 
@@ -46,4 +47,10 @@ export async function SavedCount() {
   const supabase = await createClient();
   const { count } = await supabase.from("saved_contacts").select("person_id", { count: "exact", head: true }).eq("owner_user_id", viewer.userId);
   return <>{count ?? 0}</>;
+}
+
+/** The sidebar's Administration link, for administrators only. */
+export async function AdminNav() {
+  const viewer = await getViewer();
+  return viewer?.isAdmin ? <AdminNavItem /> : null;
 }

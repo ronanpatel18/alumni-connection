@@ -62,7 +62,7 @@ export interface ProfileFacts {
   specialties: string[];
   bio: string | null;
   educations: { school: string | null; degree: string | null; major: string | null; gradYear: number | null }[];
-  positions: { title: string; organizationName: string; isCurrent: boolean }[];
+  positions: { title: string; organizationName: string; isCurrent: boolean; startYear?: number | null; endYear?: number | null }[];
 }
 
 export interface CandidateForExplanation {
