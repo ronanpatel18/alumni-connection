@@ -8,6 +8,7 @@ import { EmptyState, OPEN_TO_LABELS, PageTitle, PersonRow, type PersonSummary } 
 import { getAi } from "@/lib/ai";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
+import { type ActiveFilters, DEFAULT_RADIUS, filterChips, type FilterNames, preferenceRecovery, radiusChoices, type SearchRecovery } from "@/lib/search/filters";
 import { parseSearchText } from "@/lib/search/parse-query";
 import { getVocabulary } from "@/lib/search/vocabulary";
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +17,6 @@ import { requireMember } from "@/lib/viewer";
 export const metadata: Metadata = { title: "Search" };
 
 const PAGE_SIZE = 10;
-const RADIUS_OPTIONS = [10, 25, 50, 100, 250];
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -36,6 +36,7 @@ interface Facets {
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const all = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
 const toInt = (v: string) => (/^\d+$/.test(v) ? Number(v) : null);
+const searchText = (params: SearchParams) => first(params.q).slice(0, 200);
 
 function hrefWith(params: SearchParams, changes: Record<string, string | null>) {
   const url = new URLSearchParams();
@@ -49,11 +50,15 @@ function hrefWith(params: SearchParams, changes: Record<string, string | null>) 
 
 async function SearchFilters({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const { industries, places, groups } = await getVocabulary();
+  const { industries, places, groups, vocab } = await getVocabulary();
   const sectors = industries.filter((i) => i.parent_id === null);
+  const q = searchText(params);
+  const radius = radiusChoices(q ? parseSearchText(q, vocab).query.radiusMiles : null, toInt(first(params.radius)));
 
   return (
-    <form id="search-form" action="/search" role="search">
+    // Keyed by the URL: the fields are uncontrolled, so a link that changes the
+    // filters would otherwise leave them showing (and resubmitting) the old search.
+    <form key={hrefWith(params, {})} id="search-form" action="/search" role="search">
       <label className="search-label" htmlFor="query">
         Search the alumni network
       </label>
@@ -97,10 +102,10 @@ async function SearchFilters({ searchParams }: { searchParams: Promise<SearchPar
         <label className="sr-only" htmlFor="radius">
           Radius
         </label>
-        <select id="radius" name="radius" defaultValue={first(params.radius) || "50"}>
-          {RADIUS_OPTIONS.map((r) => (
-            <option key={r} value={r}>
-              {r} miles
+        <select id="radius" name="radius" defaultValue={radius.defaultValue}>
+          {radius.options.map(({ value, label }) => (
+            <option key={label} value={value}>
+              {label}
             </option>
           ))}
         </select>
@@ -158,7 +163,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
   const { industries, places, groups, vocab } = await getVocabulary();
 
   // Free text → filters: rules first, a model only when the rules recognize nothing.
-  const q = first(params.q).slice(0, 200);
+  const q = searchText(params);
   let parsed = q ? parseSearchText(q, vocab) : null;
   if (parsed?.needsModel && getAi().config.mode !== "fixture") {
     const query = await getAi().parseSearchQuery(q, vocab);
@@ -169,7 +174,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
   // Explicit filters win over what was parsed from the text.
   const industrySlugs = all(params.industry).length ? all(params.industry) : (parsed?.query.industrySlugs ?? []);
   const placeId = toInt(first(params.place)) ?? parsed?.placeId ?? null;
-  const radius = toInt(first(params.radius)) ?? parsed?.query.radiusMiles ?? 50;
+  const radius = toInt(first(params.radius)) ?? parsed?.query.radiusMiles ?? DEFAULT_RADIUS;
   const gradFrom = toInt(first(params.from)) ?? parsed?.query.gradYearMin ?? null;
   const gradTo = toInt(first(params.to)) ?? parsed?.query.gradYearMax ?? null;
   const openTo = all(params.open).length ? all(params.open) : (parsed?.query.openTo ?? []);
@@ -212,14 +217,32 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
   const totalPages = Math.max(1, Math.ceil(f.total / PAGE_SIZE));
 
   const place = places.find((p) => p.id === placeId);
-  const interpreted = [
-    industrySlugs.length && `Industry: ${industrySlugs.map((s) => industries.find((i) => i.slug === s)?.name ?? s).join(", ")}`,
-    place && `Near: ${place.name}, ${place.state} (${radius} mi)`,
-    (gradFrom || gradTo) && `Class: ${gradFrom === gradTo ? gradFrom : `${gradFrom ?? "…"}–${gradTo ?? "…"}`}`,
-    openTo.length && `Open to: ${openTo.map((o) => OPEN_TO_LABELS[o] ?? o).join(", ")}`,
-    groupSlug && `Group: ${groups.find((g) => g.slug === groupSlug)?.name ?? groupSlug}`,
-    parsed?.query.text && `Keywords: “${parsed.query.text}”`,
-  ].filter(Boolean);
+  const active: ActiveFilters = {
+    text: parsed?.query.text ?? null,
+    industrySlugs,
+    placeId,
+    radius,
+    gradFrom,
+    gradTo,
+    openTo,
+    groupSlug,
+    confirmedOnly,
+  };
+  const names: FilterNames = {
+    industry: (slug) => industries.find((i) => i.slug === slug)?.name ?? slug,
+    place: place ?? null,
+    group: groups.find((g) => g.slug === groupSlug)?.name ?? null,
+  };
+  const chips = filterChips(active, names);
+
+  // A preference that empties the results: count the same search without it, to
+  // tell a market nobody has opted into yet apart from one with nobody in it.
+  let recovery: SearchRecovery | null = null;
+  if (f.total === 0 && openTo.length) {
+    const broader = await supabase.rpc("search_facets", { ...filters, p_open_to: null });
+    if (broader.error) throw broader.error;
+    recovery = preferenceRecovery(active, names, (broader.data as Facets).total);
+  }
 
   const breakdown = (title: string, rows: { key: string; label: string; row: FacetRow }[]) => (
     <>
@@ -243,12 +266,21 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
 
   return (
     <>
-      {interpreted.length > 0 && (
-        <p className="meta" style={{ margin: "16px 0" }}>
-          Interpreted filters · {interpreted.join(" · ")}
-        </p>
+      {chips.length > 0 && (
+        <div className="filter-chips" role="group" aria-labelledby="interpreted-filters">
+          <span id="interpreted-filters" className="meta">
+            Interpreted filters
+          </span>
+          {chips.map((chip) => (
+            // No prefetch: each chip is a full search, counted against the rate limit.
+            <Link key={chip.key} className="filter-chip" href={chip.href} prefetch={false} aria-label={`Remove filter: ${chip.label}`}>
+              {chip.label}
+              <Icon name="close" />
+            </Link>
+          ))}
+        </div>
       )}
-      <div className="split" style={{ marginTop: interpreted.length ? 0 : 24 }}>
+      <div className="split" style={{ marginTop: chips.length ? 0 : 24 }}>
         <section className="panel">
           <div className="section-head pad" style={{ margin: 0 }}>
             <h2 id="result-count">
@@ -291,11 +323,11 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
             </>
           ) : (
             <EmptyState
-              title="No matches yet"
-              text="Try a wider market, remove a filter, or search for a different specialty."
+              title={recovery?.title ?? "No matches yet"}
+              text={recovery?.text ?? "Try a wider market, remove a filter, or search for a different specialty."}
               action={
-                <Link className="btn primary" href="/search">
-                  Clear filters
+                <Link className="btn primary" href={recovery?.href ?? "/search"} prefetch={false}>
+                  {recovery?.actionLabel ?? "Clear filters"}
                 </Link>
               }
             />

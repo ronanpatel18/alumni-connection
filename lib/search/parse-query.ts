@@ -39,6 +39,23 @@ const OPEN_TO_PATTERNS: [RegExp, ParsedQuery["openTo"][number]][] = [
   [/\bfundrais(ing|e)\b/, "fundraising"],
 ];
 
+// What can follow "open to". Read before places and industries, because
+// "investing" is also a finance synonym. Bare "networking" stays a keyword: it
+// is also a field ("cisco networking"), so it only counts after "open to".
+const OPEN_TO_PHRASES: [string, ParsedQuery["openTo"][number]][] = [
+  ["network(?:ing)?", "networking"],
+  ["mentor(?:ing|ship)?", "mentoring"],
+  ["hiring", "hiring"],
+  ["job seeking", "job_seeking"],
+  ["invest(?:ing)?", "investing"],
+  ["fundrais(?:ing|e)", "fundraising"],
+  ["referrals?", "referrals"],
+  ["meeting travell?ers", "meeting_travelers"],
+  ["speak(?:ing)?", "speaking"],
+];
+const OPEN_TO_ITEM = `(?:${OPEN_TO_PHRASES.map(([phrase]) => phrase).join("|")})`;
+const OPEN_TO_CLAUSE = new RegExp(`\\bopen to (${OPEN_TO_ITEM}(?: (?:and |or )?${OPEN_TO_ITEM})*)\\b`);
+
 const STOPWORDS = new Set(
   ("show me find who are is the a an in near around at of for with and or people person working work works worked " +
     "folks professionals someone anyone looking to meet connect i my want need any all from based live living " +
@@ -59,6 +76,15 @@ export function parseSearchText(input: string, vocab: SearchVocabulary): RulePar
   const take = (pattern: RegExp) => {
     text = text.replace(pattern, " ");
   };
+
+  const openTo: ParsedQuery["openTo"] = [];
+  const openToClause = text.match(OPEN_TO_CLAUSE);
+  if (openToClause) {
+    for (const [phrase, value] of OPEN_TO_PHRASES) {
+      if (new RegExp(`\\b${phrase}\\b`).test(openToClause[1])) openTo.push(value);
+    }
+    take(OPEN_TO_CLAUSE);
+  }
 
   let radiusMiles: number | null = null;
   const radius = text.match(/\bwithin (\d{1,3}) ?(mi|miles?)\b/);
@@ -136,10 +162,9 @@ export function parseSearchText(input: string, vocab: SearchVocabulary): RulePar
     }
   }
 
-  const openTo: ParsedQuery["openTo"] = [];
   for (const [pattern, value] of OPEN_TO_PATTERNS) {
     if (pattern.test(text)) {
-      openTo.push(value);
+      if (!openTo.includes(value)) openTo.push(value);
       take(pattern);
     }
   }

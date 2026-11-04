@@ -14,6 +14,7 @@ const vocab: SearchVocabulary = {
     { id: 2, name: "St. Paul", state: "MN", metro: "Twin Cities" },
     { id: 3, name: "New York", state: "NY", metro: "New York" },
     { id: 4, name: "Dallas", state: "TX", metro: "Dallas–Fort Worth" },
+    { id: 5, name: "Seattle", state: "WA", metro: "Seattle" },
   ],
 };
 
@@ -47,6 +48,44 @@ describe("parseSearchText", () => {
       placeId: 2,
       query: { gradYearMin: 1990, gradYearMax: 1999, industrySlugs: ["finance"] },
     });
+  });
+
+  it("maps 'open to networking' to the preference and leaves no stray keywords", () => {
+    const r = parseSearchText("Technology in Seattle open to networking", vocab);
+    expect(r.query.industrySlugs).toEqual(["technology"]);
+    expect(r.placeId).toBe(5);
+    expect(r.query.city).toBe("Seattle");
+    expect(r.query.openTo).toEqual(["networking"]);
+    expect(r.query.text).toBeNull();
+    expect(r.needsModel).toBe(false);
+  });
+
+  it("reads every 'open to' preference without leaving 'open' behind", () => {
+    const cases: [string, string[]][] = [
+      ["open to mentoring", ["mentoring"]],
+      ["alumni open to job seeking", ["job_seeking"]],
+      ["open to meeting travelers in Chicago", ["meeting_travelers"]],
+      ["open to speaking or mentoring", ["speaking", "mentoring"]],
+      ["open to networking and referrals", ["networking", "referrals"]],
+    ];
+    for (const [input, openTo] of cases) {
+      const { query } = parseSearchText(input, vocab);
+      expect([...query.openTo].sort()).toEqual([...openTo].sort());
+      expect(query.text).toBeNull();
+    }
+  });
+
+  it("treats 'open to investing' as a preference, not the finance industry", () => {
+    const r = parseSearchText("tech open to investing", vocab);
+    expect(r.query.openTo).toEqual(["investing"]);
+    expect(r.query.industrySlugs).toEqual(["technology"]);
+    expect(r.query.text).toBeNull();
+  });
+
+  it("keeps 'networking' as a keyword outside an 'open to' phrase", () => {
+    const r = parseSearchText("cisco networking", vocab);
+    expect(r.query.openTo).toEqual([]);
+    expect(r.query.text).toBe("cisco networking");
   });
 
   it("keeps unrecognized words as free text (names, employers)", () => {
