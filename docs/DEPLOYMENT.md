@@ -33,11 +33,10 @@ In the Supabase dashboard:
 - **Authentication → URL Configuration**
   - Site URL: your Vercel address from step 4 (e.g. `https://alumni-connect.vercel.app`).
   - Redirect URLs: add `https://<your-domain>/**`.
-- **Authentication → Emails → SMTP Settings**: turn on custom SMTP. Supabase's built-in
-  email only sends a few messages an hour, and only to your own team, so real members
-  can't sign in without this. With Resend (free tier, needs a domain you control):
-  host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key,
-  sender = an address on your verified domain.
+
+Sign-in links are sent by the app through Resend (`RESEND_API_KEY` and `EMAIL_FROM` in
+step 4), so Supabase's own SMTP settings aren't needed. Resend's free tier needs a domain
+you control, verified under **Domains**; `EMAIL_FROM` must use that domain.
 
 ## 4. Deploy to Vercel (you, then automatic)
 

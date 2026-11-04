@@ -4,9 +4,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { DEV_LOGIN_PATH, devAutoLoginEmail } from "@/lib/dev-auto-login";
-import { publicEnv } from "@/lib/env";
 import { checkRateLimit, getClientIP, LIMITS } from "@/lib/rate-limit";
-import { createClient } from "@/lib/supabase/server";
+import { sendSignInEmail } from "@/lib/sign-in-link";
 import { emailSchema } from "@/lib/validation";
 
 export type LoginState = { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
@@ -31,14 +30,8 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   const limit = await checkRateLimit("login", getClientIP(await headers()), LIMITS.strict);
   if (!limit.allowed) return { status: "error", message: "Too many attempts. Try again in a minute." };
 
-  const supabase = await createClient();
-  const redirectTo = new URL("/auth/confirm", publicEnv.NEXT_PUBLIC_SITE_URL);
-  redirectTo.searchParams.set("next", parsed.data.next);
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email: parsed.data.email,
-    options: { emailRedirectTo: redirectTo.toString() },
-  });
-  if (error) return { status: "error", message: "We couldn't send the link. Try again shortly." };
+  const result = await sendSignInEmail(parsed.data.email, parsed.data.next);
+  if (result === "limited") return { status: "error", message: "Too many attempts. Try again in a minute." };
+  if (result === "failed") return { status: "error", message: "We couldn't send the link. Try again shortly." };
   return { status: "sent", email: parsed.data.email };
 }

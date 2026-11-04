@@ -35,6 +35,7 @@ export async function sendEmail(email: Email): Promise<boolean> {
         body: JSON.stringify({ from: FROM, to: [email.to], subject: email.subject, text: email.text }),
         signal: AbortSignal.timeout(10_000),
       });
+      if (!response.ok) console.warn("[email] Resend refused the message:", response.status, (await response.text()).slice(0, 300));
       return response.ok;
     }
     const match = FROM.match(/^(.*)<(.+)>$/);
