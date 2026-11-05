@@ -78,7 +78,6 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
 }
 
 const CONTACT_KINDS = ["email", "phone", "website", "linkedin"] as const;
-const visibility = z.enum(["members", "connections", "private"]);
 const contactValue = {
   email: z.union([z.literal(""), z.email("Enter a complete email address, such as alex@example.com.")]),
   phone: z.union([z.literal(""), z.string().regex(/^[+0-9 ().-]{7,30}$/, "Enter a phone number using digits, spaces, dashes or parentheses.")]),
@@ -92,23 +91,22 @@ const contactValue = {
 export async function saveContacts(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireMember("/me/privacy");
   const fields: Record<string, string> = {};
-  const items: { kind: string; value: string; visibility: string }[] = [];
+  // Every detail is visible to verified members; a blank field removes it.
+  const items: { kind: string; value: string; visibility: "members" }[] = [];
   for (const kind of CONTACT_KINDS) {
     const value = sanitizeString(String(formData.get(`${kind}_value`) ?? ""));
     const parsedValue = contactValue[kind].safeParse(value);
-    const parsedVisibility = visibility.safeParse(formData.get(`${kind}_visibility`));
     if (!parsedValue.success) fields[`${kind}_value`] = parsedValue.error.issues[0].message;
-    if (!parsedVisibility.success) fields[`${kind}_visibility`] = "Choose who can see this.";
-    items.push({ kind, value, visibility: parsedVisibility.success ? parsedVisibility.data : "private" });
+    items.push({ kind, value, visibility: "members" });
   }
   if (Object.keys(fields).length) return { status: "error", message: "Check the highlighted details.", fields };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("update_my_contacts", { p: items });
-  if (error) return { status: "error", message: "We couldn’t save your settings. Your changes are still here; try again." };
+  if (error) return { status: "error", message: "We couldn’t save your details. Your changes are still here; try again." };
 
   revalidatePath("/", "layout");
-  return { status: "saved", message: "Contact details and privacy saved. A changed email address needs verifying again." };
+  return { status: "saved", message: "Contact details saved. A changed email address needs verifying again." };
 }
 
 /** "Leave the network": same removal as the public private-link flow, then sign out. */

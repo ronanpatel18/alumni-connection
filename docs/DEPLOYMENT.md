@@ -63,10 +63,11 @@ https://upstash.com). Without them, rate limits are counted per server instance,
 on Vercel means they're weak.
 
 Never set `DEV_AUTO_LOGIN_EMAIL` or `INNGEST_DEV` in production (the auto sign-in is
-ignored outside `next dev` anyway). Inngest is optional for now: the existing AI
-summaries are copied with the people in step 2, and nothing in the app waits on a
-background job. Add `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` when you want summaries
-written automatically for new profiles.
+ignored outside `next dev` anyway). Add `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` and
+sync `/api/inngest` in Inngest Cloud before inviting anyone: a job runs every five minutes
+to retry failed notification emails, and without it a failed email waits until someone's
+next message or introduction. It also writes AI summaries for new profiles. Failed and
+waiting emails show under **Administration → Pilot progress**.
 
 3. Deploy. After that, every push to `main` deploys automatically.
 

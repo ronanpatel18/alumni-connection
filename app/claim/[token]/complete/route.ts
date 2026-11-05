@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: RouteContext<"/claim/[to
   }
 
   const result = await claimByLink(token, userId, email);
-  if (result.status === "approved") return NextResponse.redirect(new URL(`/people/${result.person_id}?claimed=1`, site));
+  if (result.status === "approved") return NextResponse.redirect(new URL("/welcome", site));
   if (result.status === "pending") return back("?status=submitted");
   return back(`?error=${result.reason}`);
 }

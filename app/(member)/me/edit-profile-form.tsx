@@ -71,8 +71,8 @@ export function EditProfileForm({
         <div className="notice">
           <Icon name="info" />
           <div>
-            {confirmed ? "Your profile is confirmed." : "Your profile is waiting for confirmation."} Saving an edit doesn’t change the
-            privacy of your contact details.
+            {confirmed ? "Your profile is confirmed." : "Your profile is waiting for confirmation."} Saving an edit doesn’t change your
+            contact details.
           </div>
         </div>
       )}
@@ -153,7 +153,7 @@ export function EditProfileForm({
           {pending ? "Saving…" : "Save profile"}
         </button>
         <Link className="btn" href="/me/privacy">
-          Manage contact visibility
+          Manage contact details
         </Link>
       </div>
     </form>

@@ -12,7 +12,7 @@ export function NoProfileNotice() {
           </p>
           <p>
             If you received an invitation email, open its private link to claim your profile. Once it’s linked to your
-            account you can edit it and choose who sees your contact details here.
+            account you can edit it and manage your contact details here.
           </p>
         </div>
       </div>

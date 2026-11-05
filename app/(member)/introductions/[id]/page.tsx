@@ -9,7 +9,7 @@ import { RelationshipTabs } from "@/components/relationship-tabs";
 import { type IntroDetails, introDetails, introStatusText, isOpen } from "@/lib/introductions";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
-import { cancelIntro, decideIntro } from "../actions";
+import { cancelIntro, decideIntro, recordMeeting } from "../actions";
 
 export const metadata: Metadata = { title: "Introduction" };
 
@@ -51,13 +51,31 @@ function Decision({ d, role, yes, no }: { d: IntroDetails; role: "connector" | "
   );
 }
 
+/** For the two people introduced, once it's done. Shows what they said, and lets them say it. */
+function Outcome({ introId, iMet, otherMet, name }: { introId: string; iMet: boolean; otherMet: boolean; name: string }) {
+  if (iMet) return <p className="small muted">You’ve recorded that you met {name}.</p>;
+  return (
+    <form action={recordMeeting} className="od-cluster">
+      <input type="hidden" name="intro_id" value={introId} />
+      <button type="submit" className="btn">
+        We met
+      </button>
+      <span className="meta">{otherMet ? `${name} has recorded that you met.` : "Let us know if this introduction led to a meeting."}</span>
+    </form>
+  );
+}
+
 async function Intro({ params, searchParams }: { params: PageProps<"/introductions/[id]">["params"]; searchParams: PageProps<"/introductions/[id]">["searchParams"] }) {
   const { id } = await params;
   const { sent, decided } = await searchParams;
   const viewer = await requireMember(`/introductions/${id}`);
-  const d = await introDetails(await createClient(), id);
+  const supabase = await createClient();
+  const d = await introDetails(supabase, id);
   if (!d) notFound();
   const status = introStatusText(d);
+  const { data: meetings } = await supabase.from("intro_events").select("actor_user_id").eq("intro_id", id).eq("action", "met");
+  const iMet = (meetings ?? []).some((m) => m.actor_user_id === viewer.userId);
+  const otherMet = (meetings ?? []).some((m) => m.actor_user_id !== viewer.userId);
 
   const notice =
     sent === "1" ? (
@@ -91,7 +109,7 @@ async function Intro({ params, searchParams }: { params: PageProps<"/introductio
           </div>
         </div>
         <p className="small muted">
-          Agreeing asks {first(d.target_name)} privately whether they’d like the introduction. It doesn’t share anyone’s contact details.
+          Agreeing asks {first(d.target_name)} privately whether they’d like the introduction.
         </p>
         {d.status === "pending_connector" && <Decision d={d} role="connector" yes="I’m happy to introduce them" no="Decline quietly" />}
         <p className="meta">A decline closes the request without asking for a reason.</p>
@@ -118,9 +136,10 @@ async function Intro({ params, searchParams }: { params: PageProps<"/introductio
           </div>
         </div>
         <p className="small muted">
-          Accepting records the introduction for both of you. Your contact settings stay as they are. Declining shares no contact details.
+          Accepting records the introduction for both of you. If you decline, nobody is told it was you.
         </p>
         {d.status === "pending_target" && <Decision d={d} role="recipient" yes="Accept introduction" no="Not right now" />}
+        {d.status === "accepted" && <Outcome introId={d.id} iMet={iMet} otherMet={otherMet} name={first(d.requester_name)} />}
       </section>
     );
   }
@@ -154,15 +173,16 @@ async function Intro({ params, searchParams }: { params: PageProps<"/introductio
             <div>
               <p>
                 Both {first(d.connector_name)} and {first(d.target_name)} agreed.{" "}
-                {viewer.personId
-                  ? "You’re now connected, so contact details they share with connections are visible to you."
-                  : "Claim your own profile to become connected and see details they share with connections."}
+                {viewer.personId ? "You’re now connected." : "Claim your own profile to show this connection on it."}
               </p>
               <p>
                 <Link href={`/messages/new?person=${d.target_id}`}>Send {first(d.target_name)} a message</Link>
                 {" · "}
                 <Link href={`/people/${d.target_id}`}>Open their profile</Link>
               </p>
+              <div style={{ marginTop: 12 }}>
+                <Outcome introId={d.id} iMet={iMet} otherMet={otherMet} name={first(d.target_name)} />
+              </div>
             </div>
           </div>
         ) : isOpen(d.status) ? (

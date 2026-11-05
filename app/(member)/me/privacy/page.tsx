@@ -12,7 +12,7 @@ import { type ContactRow, ContactsForm } from "./contacts-form";
 
 export const metadata: Metadata = { title: "Privacy & visibility" };
 
-const KINDS: Omit<ContactRow, "value" | "visibility" | "verified">[] = [
+const KINDS: Omit<ContactRow, "value" | "verified">[] = [
   { kind: "email", label: "Email address", type: "email", placeholder: "Not provided" },
   { kind: "phone", label: "Phone number", type: "tel", placeholder: "Not provided" },
   { kind: "website", label: "Website", type: "url", placeholder: "https://" },
@@ -27,7 +27,7 @@ async function Privacy() {
   const rows: ContactRow[] = KINDS.map((k) => {
     const point =
       profile.contact_points.find((c) => c.kind === k.kind && c.source === "self") ?? profile.contact_points.find((c) => c.kind === k.kind);
-    return { ...k, value: point?.value ?? "", visibility: point?.visibility ?? "members", verified: Boolean(point?.verified_at) };
+    return { ...k, value: point?.value ?? "", verified: Boolean(point?.verified_at) };
   });
 
   return (
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
       <PageTitle
         eyebrow="Profile & privacy"
         title="Your privacy, in plain sight."
-        description="Choose who can see each contact detail. You can change these settings at any time."
+        description="Your contact details are visible to all verified members. You can change or remove them at any time."
       />
       <ProfileTabs />
       <Suspense fallback={<div className="panel pad"><div className="skeleton big" /><div className="skeleton" /></div>}>

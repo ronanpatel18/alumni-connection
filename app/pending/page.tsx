@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: "Verification pending" };
 async function PendingStatus() {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
-  if (viewer.isVerified) redirect("/discover");
+  // Someone still here when an administrator approves them goes on to setup.
+  if (viewer.isVerified) redirect(viewer.personId ? "/welcome" : "/discover");
   const supabase = await createClient();
   const { count: pendingClaims } = await supabase
     .from("claim_requests")

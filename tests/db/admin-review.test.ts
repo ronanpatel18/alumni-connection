@@ -124,6 +124,32 @@ describe("admin_decide_claim", () => {
     expect(again.rows[0].r.reason).toBe("already_decided");
   });
 
+  it("tells the claimant once when approved, and points them at setup", async () => {
+    const claimant = await createUser(db, "approved@example.com", "pending");
+    const person = await personNeedingReview();
+    const { rows: req } = await db.query<{ id: string }>("insert into claim_requests (person_id, user_id, method) values ($1, $2, 'manual') returning id", [person.id, claimant]);
+    const notices = () => db.query<{ kind: string; link: string }>("select kind, link from notifications where user_id = $1", [claimant]).then((r) => r.rows);
+
+    expect(await notices()).toEqual([]);
+    await asUser(db, admin, () => db.query("select admin_decide_claim($1, true)", [req[0].id]));
+    expect(await notices()).toEqual([{ kind: "claim_approved", link: "/welcome" }]);
+
+    await asUser(db, admin, () => db.query("select admin_decide_claim($1, true)", [req[0].id]));
+    expect(await notices()).toHaveLength(1);
+  });
+
+  it("sends no approval notice for a declined claim or one approved by email match", async () => {
+    const declined = await createUser(db, "declined@example.com", "pending");
+    const matched = await createUser(db, "matched@example.com", "pending");
+    const person = await personNeedingReview();
+    const { rows: req } = await db.query<{ id: string }>("insert into claim_requests (person_id, user_id, method) values ($1, $2, 'manual') returning id", [person.id, declined]);
+    await asUser(db, admin, () => db.query("select admin_decide_claim($1, false)", [req[0].id]));
+    await db.query("insert into claim_requests (person_id, user_id, method, status, decided_at) values ($1, $2, 'email_match', 'approved', now())", [person.id, matched]);
+
+    const { rows } = await db.query("select id from notifications where user_id = any($1)", [[declined, matched]]);
+    expect(rows).toEqual([]);
+  });
+
   it("declines a claim without linking anything", async () => {
     const claimant = await createUser(db, "someone@example.com", "pending");
     const person = await personNeedingReview();

@@ -84,6 +84,32 @@ describe("update_my_profile", () => {
   });
 });
 
+describe("the post-claim setup save", () => {
+  it("leaves education alone when no education fields are sent", async () => {
+    await db.query("delete from educations where person_id = $1", [personId]);
+    await db.query(
+      "insert into educations (person_id, institution_id, degree, grad_year, verified_by) select $1, institution_id, 'MBA', 1999, 'roster' from people where id = $1",
+      [personId],
+    );
+    await db.query(
+      "insert into educations (person_id, institution_id, degree, grad_year, verified_by) select $1, institution_id, 'BBA', 1994, 'source' from people where id = $1",
+      [personId],
+    );
+    await db.query("update people set bio = 'Keeps this bio' where id = $1", [personId]);
+
+    const p = { full_name: "Setup Member", current_title: "Director", employer: "Acme", place_id: null, industry_id: null, class_year: null, school: null, degree: null, major: null, open_to: ["networking"], bio: "Keeps this bio" };
+    await asUser(db, owner, () => db.query("select update_my_profile($1::jsonb)", [JSON.stringify(p)]));
+
+    const { rows } = await db.query<{ degree: string; verified_by: string }>("select degree, verified_by from educations where person_id = $1 order by degree", [personId]);
+    expect(rows).toEqual([
+      { degree: "BBA", verified_by: "source" },
+      { degree: "MBA", verified_by: "roster" },
+    ]);
+    const { rows: me } = await db.query<{ bio: string; open_to: string[] }>("select bio, open_to from people where id = $1", [personId]);
+    expect(me[0]).toEqual({ bio: "Keeps this bio", open_to: ["networking"] });
+  });
+});
+
 describe("update_my_contacts", () => {
   const contacts = (email: string, emailVisibility = "members", phone = "") =>
     JSON.stringify([

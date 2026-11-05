@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { EmptyState, PageTitle, PersonRow } from "@/components/person";
-import { Relevance } from "@/components/relevance";
+import { EmptyState, PageTitle } from "@/components/person";
+import { SuggestionRow } from "@/components/suggestion-row";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { GOALS, type Goal, isGoal, suggestionReasons, suggestions } from "@/lib/recommendations";
 import { getVocabulary } from "@/lib/search/vocabulary";
@@ -85,26 +85,14 @@ async function Results({ searchParams }: { searchParams: PageProps<"/discover/wh
 
   return (
     <div className="stack">
-      {list.map(({ person, evidence }) => (
-        <section key={person.id} className="panel suggestion">
-          <PersonRow person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
-          <div className="pad suggestion-why">
-            <Suspense
-              fallback={
-                <p className="meta" role="status">
-                  Writing why they may be relevant…
-                </p>
-              }
-            >
-              <Relevance
-                reasons={reasons}
-                personId={person.id}
-                evidence={`Goal: ${GOALS[goal].phrase} · Evidence: ${evidence.join(", ") || "profile details"}`}
-              />
-            </Suspense>
-          </div>
-        </section>
-      ))}
+      {list.map((suggestion) => {
+        const { id } = suggestion.person;
+        return (
+          <section key={id} className="panel suggestion">
+            <SuggestionRow suggestion={suggestion} saved={saved.has(id)} cue={cues.get(id)} linkedin={linkedin.get(id)} reasons={reasons} />
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -138,7 +126,8 @@ export default function WhoToMeetPage({ searchParams }: PageProps<"/discover/who
         <Results searchParams={searchParams} />
       </Suspense>
       <p className="footnote">
-        Suggestions use your goal, market and profile details such as role, industry and experience. They’re starting points, not
+        Suggestions use your goal, market and profile details such as role, industry and experience, and people you can reach here come
+        first. They’re starting points, not
         endorsements or a ranking of anyone. Relevance lines are AI-written and can miss context.
       </p>
     </>

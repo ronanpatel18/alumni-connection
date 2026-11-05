@@ -121,3 +121,86 @@ describe("closing a request", () => {
     expect(await status(id)).toBe("expired");
   });
 });
+
+describe("recording a meeting", () => {
+  let id: string;
+  const record = (user: string | null, intro = id) => asUser(db, user, () => db.query<{ r: string }>("select record_intro_meeting($1) as r", [intro])).then((r) => r.rows[0].r);
+  const metCount = async () => (await db.query("select 1 from intro_events where intro_id = $1 and action = 'met'", [id])).rows.length;
+
+  beforeAll(async () => {
+    id = await request();
+    await asUser(db, connectorUser, () => db.query("select decide_intro_as_connector($1, true)", [id]));
+  });
+
+  it("isn't possible until both have agreed", async () => {
+    await expect(record(requester)).rejects.toThrow(/completed introduction/);
+    await asUser(db, recipientUser, () => db.query("select decide_intro_as_recipient($1, true)", [id]));
+  });
+
+  it("belongs only to the two people introduced", async () => {
+    await expect(record(connectorUser)).rejects.toThrow(/isn't yours/);
+    await expect(record(stranger)).rejects.toThrow(/isn't yours/);
+    await expect(record(null)).rejects.toThrow(/permission denied/);
+    expect(await metCount()).toBe(0);
+  });
+
+  it("records once per person, and adds it to the requester's relationship history", async () => {
+    expect(await record(requester)).toBe("recorded");
+    expect(await record(requester)).toBe("already_recorded");
+    expect(await metCount()).toBe(1);
+    const logged = await db.query("select 1 from interactions where owner_user_id = $1 and person_id = $2 and kind = 'meeting'", [requester, recipient]);
+    expect(logged.rows).toHaveLength(1);
+  });
+
+  it("lets the recipient record it too, without notifying anyone", async () => {
+    const before = await db.query("select 1 from notifications");
+    expect(await record(recipientUser)).toBe("recorded");
+    expect(await metCount()).toBe(2);
+    expect((await db.query("select 1 from notifications")).rows.length).toBe(before.rows.length);
+  });
+});
+
+describe("admin_intro_metrics", () => {
+  let admin: string;
+  interface Metrics {
+    requested: number;
+    awaiting_connector: number;
+    awaiting_recipient: number;
+    accepted: number;
+    declined: number;
+    closed: number;
+    met: number;
+  }
+  const metrics = (group: string | null = null) => asUser(db, admin, () => db.query<{ m: Metrics }>("select admin_intro_metrics($1) as m", [group])).then((r) => r.rows[0].m);
+
+  beforeAll(async () => {
+    admin = await createUser(db, "admin@example.com", "admin");
+  });
+
+  it("counts each stage, and each met introduction once though both recorded it", async () => {
+    const before = await metrics();
+    expect(before.met).toBe(1);
+    expect(before.requested).toBe(before.awaiting_connector + before.awaiting_recipient + before.accepted + before.declined + before.closed);
+    expect(before.accepted).toBeGreaterThan(0);
+  });
+
+  it("treats a request past its date as closed, even before anyone opens it", async () => {
+    const before = await metrics();
+    const id = await request();
+    await db.query("update intro_requests set expires_at = now() - interval '1 day' where id = $1", [id]);
+    const after = await metrics();
+    expect(after.closed).toBe(before.closed + 1);
+    expect(after.awaiting_connector).toBe(before.awaiting_connector);
+    await db.query("update intro_requests set status = 'expired' where id = $1", [id]);
+  });
+
+  it("limits to introductions to one group", async () => {
+    expect((await metrics("test-board")).requested).toBeGreaterThan(0);
+    expect((await metrics("no-such-group")).requested).toBe(0);
+  });
+
+  it("is for administrators only", async () => {
+    await expect(asUser(db, requester, () => db.query("select admin_intro_metrics()"))).rejects.toThrow(/Administrators only/);
+    await expect(asUser(db, null, () => db.query("select admin_intro_metrics()"))).rejects.toThrow(/permission denied/);
+  });
+});

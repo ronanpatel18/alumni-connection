@@ -102,9 +102,9 @@ Initial avatar, full name/detail link, explicit profile status, current title/em
 
 ### Contact details
 
-Each detail has its own visibility and verification state. Explain restricted access beside the detail rather than leaving a mysterious lock. Modes: verified members, accepted connections, hidden. A verified email label does not imply the phone or website is verified. Changing an email removes its verified label until verification occurs again.
+Every detail is visible to all verified members, and each has its own verification state. A blank detail reads “Not provided”. A verified email label does not imply the phone or website is verified. Changing an email removes its verified label until verification occurs again.
 
-First-contact relay messaging keeps the sender address private until the recipient replies. Contact visibility is a separate member setting; do not conflate the recipient’s visible address with the sender’s relay privacy.
+First-contact relay messaging keeps the sender address private until the recipient replies. A member’s listed contact details are separate from this; do not conflate the recipient’s visible address with the sender’s relay privacy.
 
 ### AI
 

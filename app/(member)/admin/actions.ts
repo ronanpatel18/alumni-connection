@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ALUMNI_STATUS_LABELS } from "@/lib/labels";
+import { deliverNotifications } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_LENGTHS, sanitizeString } from "@/lib/validation";
 import { requireAdmin } from "@/lib/viewer";
@@ -101,6 +102,7 @@ export async function decideClaim(formData: FormData) {
     p_approve: parsed.data.decision === "approve",
   });
   const result = error ? "error" : ((data as { status: string; reason?: string }).reason ?? (data as { status: string }).status);
+  if (result === "approved") await deliverNotifications(); // emails the claimant a link to setup
   revalidatePath("/admin/claims");
   redirect(`/admin/claims?result=${result}`);
 }

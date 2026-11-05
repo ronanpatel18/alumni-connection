@@ -83,7 +83,19 @@ export function LinkedInLink({ name, url, withText }: { name: string; url: strin
   );
 }
 
-export function PersonRow({ person, saved, cue, linkedin }: { person: PersonSummary; saved: boolean; cue?: string | null; linkedin?: string | null }) {
+export function PersonRow({
+  person,
+  saved,
+  cue,
+  linkedin,
+  action,
+}: {
+  person: PersonSummary;
+  saved: boolean;
+  cue?: string | null;
+  linkedin?: string | null;
+  action?: { label: string; href: string } | null;
+}) {
   const confirmed = isConfirmed(person.status);
   const market = person.metro ?? (person.city ? [person.city, person.state].filter(Boolean).join(", ") : null);
   const education = educationLabel(person.degree, person.grad_year);
@@ -121,6 +133,11 @@ export function PersonRow({ person, saved, cue, linkedin }: { person: PersonSumm
         </div>
       </div>
       <div className="person-actions">
+        {action && (
+          <Link className="btn primary" href={action.href}>
+            {action.label}
+          </Link>
+        )}
         <SaveButton personId={person.id} name={person.full_name} saved={saved} />
         <Link className="btn" href={`/people/${person.id}`}>
           View profile

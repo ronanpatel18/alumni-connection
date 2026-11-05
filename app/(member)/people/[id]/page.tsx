@@ -19,7 +19,6 @@ interface ContactPoint {
   kind: string;
   value: string;
   source: string;
-  visibility: string;
   verified_at: string | null;
 }
 
@@ -58,18 +57,8 @@ const CONTACT_KINDS = [
 
 const year = (date: string | null) => (date ? date.slice(0, 4) : null);
 
-function visibilityNote(point: ContactPoint) {
-  const reason =
-    point.visibility === "connections"
-      ? "Visible because you’re connected"
-      : point.visibility === "private"
-        ? "Visible to you as an administrator"
-        : "Visible to verified members";
-  return `${reason} · ${SOURCE_LABELS[point.source] ?? point.source}`;
-}
-
 /** Members who could introduce you (shared board or recorded connection), and the way to ask. */
-async function WarmIntro({ personId, firstName, isMe }: { personId: string; firstName: string; isMe: boolean }) {
+async function WarmIntro({ personId, firstName, isMe, confirmed }: { personId: string; firstName: string; isMe: boolean; confirmed: boolean }) {
   if (isMe) return null;
   const supabase = await createClient();
   const { data } = await supabase.rpc("intro_connectors", { p_target: personId });
@@ -87,16 +76,23 @@ async function WarmIntro({ personId, firstName, isMe }: { personId: string; firs
               </div>
             ))}
           </div>
-          <div className="form-actions">
-            <Link className="btn" href={`/introductions/new?person=${personId}`}>
-              Ask for an introduction
-            </Link>
-          </div>
+          {confirmed ? (
+            <div className="form-actions">
+              <Link className="btn" href={`/introductions/new?person=${personId}`}>
+                Ask for an introduction
+              </Link>
+            </div>
+          ) : (
+            <p className="small muted" style={{ marginTop: 16 }}>
+              {firstName} would need to accept an introduction, and hasn’t joined yet. Save this profile to come back to it.
+            </p>
+          )}
         </>
       ) : (
         <p className="small muted">
-          No member who knows {firstName} has joined yet. Start with a brief, thoughtful message, or check back once someone on their board
-          claims their profile.
+          {confirmed
+            ? `No member who knows ${firstName} has joined yet. Start with a brief, thoughtful message, or check back once someone on their board claims their profile.`
+            : `${firstName} hasn’t joined yet, and neither has anyone who knows them. Save this profile to come back to it.`}
         </p>
       )}
     </section>
@@ -118,7 +114,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
           "organizations:current_organization_id(name), industries:industry_id(name), " +
           "educations(id, school, degree, major, grad_year), " +
           "positions(id, title, organization_name, is_current, start_date, end_date), " +
-          "contact_points(id, kind, value, source, visibility, verified_at), group_memberships(groups(slug, name)), " +
+          "contact_points(id, kind, value, source, verified_at), group_memberships(groups(slug, name)), " +
           "field_provenance(field, source, source_url, fetched_at)",
       )
       .eq("id", id)
@@ -378,13 +374,13 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
               </section>
             }
           >
-            <WarmIntro personId={person.id} firstName={firstName} isMe={person.claimed_by_user_id === viewer.userId} />
+            <WarmIntro personId={person.id} firstName={firstName} isMe={person.claimed_by_user_id === viewer.userId} confirmed={confirmed} />
           </Suspense>
 
           <section className="panel pad">
             <h2 className="rail-title">Contact details</h2>
             <p className="meta" style={{ marginBottom: 20 }}>
-              {confirmed ? `Visible according to ${firstName}’s settings.` : "This profile hasn’t been claimed yet, so only public details are shown."}
+              {confirmed ? "Visible to all verified members." : "This profile hasn’t been claimed yet, so only details from public sources are shown."}
             </p>
             <div className="detail-list">
               {CONTACT_KINDS.map(({ kind, label }) => {
@@ -406,7 +402,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
                           ) : (
                             <span className="small">{p.value}</span>
                           )}
-                          <span className="meta">{visibilityNote(p)}</span>
+                          <span className="meta">{SOURCE_LABELS[p.source] ?? p.source}</span>
                           {p.verified_at && kind === "email" && (
                             <span className="chip success" style={{ justifySelf: "start" }}>
                               <Icon name="check" />
@@ -417,12 +413,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
                       ))
                     ) : (
                       <>
-                        <span className="small">
-                          <Icon name="lock" /> Not shared with you
-                        </span>
-                        <span className="meta">
-                          {confirmed ? `${firstName} hasn’t made this detail available.` : "No member-approved visibility yet."}
-                        </span>
+                        <span className="small muted">Not provided</span>
                       </>
                     )}
                   </div>

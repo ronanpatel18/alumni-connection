@@ -1,22 +1,19 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Icon } from "@/components/icon";
-import { VISIBILITY_HELP, VISIBILITY_LABELS } from "@/lib/provenance";
 import { type FormState, saveContacts } from "../actions";
 
 export interface ContactRow {
   kind: "email" | "phone" | "website" | "linkedin";
   label: string;
   value: string;
-  visibility: string;
   verified: boolean;
   type: string;
   placeholder: string;
 }
 
 function ContactField({ row, error }: { row: ContactRow; error?: string }) {
-  const [visibility, setVisibility] = useState(row.visibility);
   return (
     <div className="detail-row">
       <div className="od-row">
@@ -33,26 +30,13 @@ function ContactField({ row, error }: { row: ContactRow; error?: string }) {
         defaultValue={row.value}
         placeholder={row.placeholder}
         aria-invalid={error ? true : undefined}
-        aria-describedby={`${row.kind}-help${error ? ` ${row.kind}-error` : ""}`}
+        aria-describedby={error ? `${row.kind}-error` : undefined}
       />
       {error && (
         <span className="error-text" id={`${row.kind}-error`}>
           {error}
         </span>
       )}
-      <label className="sr-only" htmlFor={`${row.kind}_visibility`}>
-        {row.label} visibility
-      </label>
-      <select id={`${row.kind}_visibility`} name={`${row.kind}_visibility`} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-        {Object.entries(VISIBILITY_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
-      <span className="meta" id={`${row.kind}-help`}>
-        {VISIBILITY_HELP[visibility]}
-      </span>
     </div>
   );
 }
@@ -62,9 +46,10 @@ export function ContactsForm({ rows }: { rows: ContactRow[] }) {
   const errors = state.status === "error" ? (state.fields ?? {}) : {};
   return (
     <form action={action} className="panel pad">
-      <h2>Contact visibility</h2>
+      <h2>Contact details</h2>
       <p className="small muted" style={{ margin: "12px 0 24px" }}>
-        “Verified members” means alumni who have completed verification. “Connections” means people whose connection you’ve accepted.
+        Everything here is visible to all verified members, meaning alumni who have completed verification. Leave a field blank to keep it off
+        your profile.
       </p>
       {state.status !== "idle" && (
         <div className={`notice ${state.status === "saved" ? "success" : "error"}`} role={state.status === "saved" ? "status" : "alert"} style={{ marginBottom: 24 }}>
@@ -79,7 +64,7 @@ export function ContactsForm({ rows }: { rows: ContactRow[] }) {
       </div>
       <div className="form-actions">
         <button type="submit" className="btn primary" disabled={pending}>
-          {pending ? "Saving…" : "Save privacy settings"}
+          {pending ? "Saving…" : "Save contact details"}
         </button>
       </div>
     </form>

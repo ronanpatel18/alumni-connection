@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PersonSummary } from "@/components/person";
 import { getAi } from "@/lib/ai";
+import { withDeadline } from "@/lib/ai/deadline";
 import { groupCues } from "@/lib/people";
 
 export interface Trip {
@@ -100,18 +101,20 @@ export async function tripRelevance(db: SupabaseClient, userId: string, trip: Tr
       trip.goal ?? "Meet relevant alumni",
       `(visiting ${tripCity(trip)}, ${tripDates(trip)})`,
     ].join(" ");
-    const { matches } = await getAi().explainMatches(
-      goal,
-      missing.map((p) => ({
-        personId: p.id,
-        fullName: p.full_name,
-        headline: [p.current_title, p.organization_name].filter(Boolean).join(" at ") || null,
-        city: p.metro ?? p.city,
-        industryName: p.industry_name ?? null,
-        gradYear: p.grad_year,
-        sharedContext: [],
-        groups: cues.get(p.id) ? [cues.get(p.id)!] : [],
-      })),
+    const { matches } = await withDeadline(
+      getAi().explainMatches(
+        goal,
+        missing.map((p) => ({
+          personId: p.id,
+          fullName: p.full_name,
+          headline: [p.current_title, p.organization_name].filter(Boolean).join(" at ") || null,
+          city: p.metro ?? p.city,
+          industryName: p.industry_name ?? null,
+          gradYear: p.grad_year,
+          sharedContext: [],
+          groups: cues.get(p.id) ? [cues.get(p.id)!] : [],
+        })),
+      ),
     );
     // People the AI skipped are remembered with no line, so revisits don't wait on it again.
     const written = new Map(matches.map((m) => [m.personId, m.why]));

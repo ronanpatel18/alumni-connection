@@ -32,7 +32,7 @@ async function Outreach({ params }: { params: PageProps<"/trips/[id]/outreach/[p
   const trip = await loadTrip(supabase, id);
   if (!trip) notFound();
 
-  // Contact details come back only where this person's visibility settings allow (RLS).
+  // Contact details are readable by any verified member (RLS).
   const [{ data: person }, { data: existing }, { data: reason }, { data: sender }] = await Promise.all([
     supabase
       .from("people")

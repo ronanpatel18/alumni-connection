@@ -32,7 +32,7 @@ async function Thread({ params, searchParams }: { params: PageProps<"/messages/[
         {sent === "1" && (
           <div className="notice success" role="status">
             <Icon name="check" />
-            <div>Sent. {convo.other_name.split(" ")[0]} will get an email saying they have a message. Your address stays private.</div>
+            <div>Sent. {convo.other_name.split(" ")[0]} will get an email saying they have a message. Sending it doesn’t share your address.</div>
           </div>
         )}
         <div>

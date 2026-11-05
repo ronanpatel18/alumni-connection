@@ -49,7 +49,7 @@ Browser ─► Next.js (Vercel): server components + route handlers (Zod, rate l
 - `positions`: employer org, title, seniority, function, start and end dates, current flag
 - `organizations`: name, domain, NAICS industry, HQ location. Feeds the alumni business directory
 - `industries`: two-level taxonomy (NAICS sectors + custom subtags), editable by admins
-- `contact_points`: type (email, phone, website, linkedin), value, `source`, `verified_at`, `visibility` (`members|connections|private`)
+- `contact_points`: type (email, phone, website, linkedin), value, `source`, `verified_at`, `visibility` (`members|connections|private`; recorded but no longer limits reads)
 - `field_provenance`: per field: source (`self|roster|pdl|web|ai`), confidence, `fetched_at`, citation URL. **Anything the member edits themselves always wins.**
 - `edges`: person_a, person_b, type (`classmate|coworker|linkedin_import|met|introduced|mentor`), weight, source, `shared_by_consent`
 - CRM layer: `saved_contacts`, `lists`, `notes` (private), `interactions` (meetings, calls, follow-ups with due dates), `intro_requests` (requester → connector → target, double opt-in status)
@@ -183,7 +183,7 @@ Legend: **E** email · **P** phone · **C** current company/title · **Y** gradu
 - **Proving someone is an alumnus**, in this order: (1) **claim a seeded profile** (WSBC lookup/claim flow, strengthened with an emailed code to an email we have on file, or admin approval); (2) match against the institution's roster; (3) alumni or `.edu` email domain; (4) manual admin queue.
 - **Roles:** `pending`, `member` (verified), `chapter_leader`, `admin`, `super_admin`. RLS rules:
   - Only verified members can read profiles.
-  - What each contact detail shows depends on its `visibility` setting.
+  - Every contact detail is visible to all verified members. The `visibility` column is kept but no longer limits reads.
   - Notes are private to their author.
   - Admins get audit logs.
 - **Unclaimed profiles:** a public "Is this you? Claim or remove" page. Removal takes one click and adds the person to the suppression list.
@@ -338,7 +338,7 @@ Data and backend work (Phase 0–1 schema, enrichment, auth) doesn't wait on des
   - Claim/verify flow.
   - Directory with filters (geography, industry, keywords).
   - Profile editing and privacy controls.
-  - Contact visibility.
+  - Contact details.
   - Saved contacts and notes.
   - Admin review queue.
 - **Phase 2 (intelligence):**

@@ -100,9 +100,9 @@ it like a password file.
 - **Edit profile:** name, role, employer, city, industry, UW degree and class
   year, what they're open to, and a short bio. A new role moves the old one to
   history.
-- **Privacy & visibility:** email, phone, website and LinkedIn, each shown to
-  all verified members, connections only, or no one. Changing an email clears
-  its verified label until it's checked again.
+- **Privacy & visibility:** email, phone, website and LinkedIn, all visible to
+  every verified member. Leaving a field blank removes it. Changing an email
+  clears its verified label until it's checked again.
 - **Data sources:** where each field came from.
 
 Member edits are recorded as source `self` and always win over imported or AI
@@ -250,7 +250,7 @@ lib/search/             rule-based query parser, search vocabulary
 lib/supabase/           server, browser and service-role clients
 lib/rate-limit.ts       rate limiting (from conference-connection)
 lib/validation.ts       input validation (from conference-connection)
-inngest/                background jobs (profile summaries, backfill)
+inngest/                background jobs (profile summaries, backfill, email retries)
 supabase/migrations/    schema, reference data, RLS, search functions
 supabase/seed.sql       empty (real people come from importers)
 data/sources/           source snapshots for importers (e.g. WSB advisory boards)
@@ -271,7 +271,7 @@ running the app against local Supabase (needs Docker).
 - Built: magic-link sign-in, pending/verified gate, directory search with
   industry, radius, class-year and open-to filters, a free-text parser,
   confirmed vs. unconfirmed counts, breakdowns by industry and metro, profile
-  pages with per-detail contact visibility, saved contacts, private notes, and
+  pages with contact details, saved contacts, private notes, and
   the AI-summary background job, the advisory-board import with web
   enrichment, claim-or-remove links, profile editing and privacy settings, and the admin
   review queue (profile review and claim requests).

@@ -10,6 +10,8 @@ export interface Email {
   to: string;
   subject: string;
   text: string;
+  /** Resend ignores a repeat of this key for 24 hours, so a retry can't send twice. */
+  idempotencyKey?: string;
 }
 
 const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
@@ -21,6 +23,8 @@ function transport(): "resend" | "mailpit" | null {
   return null;
 }
 
+export const canSendEmail = () => transport() !== null;
+
 export async function sendEmail(email: Email): Promise<boolean> {
   const via = transport();
   if (!via) {
@@ -31,7 +35,11 @@ export async function sendEmail(email: Email): Promise<boolean> {
     if (via === "resend") {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+          ...(email.idempotencyKey ? { "Idempotency-Key": email.idempotencyKey } : {}),
+        },
         body: JSON.stringify({ from: FROM, to: [email.to], subject: email.subject, text: email.text }),
         signal: AbortSignal.timeout(10_000),
       });

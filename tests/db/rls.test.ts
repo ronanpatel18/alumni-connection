@@ -87,30 +87,18 @@ describe("membership", () => {
 });
 
 describe("contact details", () => {
-  it("private details never show to other members", async () => {
-    const privateVisible = await asUser(db, memberUser, () =>
-      count("select id from contact_points where visibility = 'private' and person_id <> $1", [memberPersonId]),
-    );
-    expect(privateVisible).toBe(0);
-  });
-
-  it("'members' details show to verified members but not pending users", async () => {
-    expect(await asUser(db, memberUser, () => count("select id from contact_points where visibility = 'members'"))).toBeGreaterThan(0);
-    expect(await asUser(db, pendingUser, () => count("select id from contact_points"))).toBe(0);
-  });
-
-  it("'connections' details show only once two people are connected", async () => {
+  it("shows every detail to verified members, whatever its visibility, and none to pending users", async () => {
     await db.query("delete from contact_points where person_id = $1", [otherPersonId]);
     await db.query(
-      "insert into contact_points (person_id, kind, value, source, visibility) values ($1, 'phone', '+1-608-555-0199', 'self', 'connections')",
+      `insert into contact_points (person_id, kind, value, source, visibility) values
+         ($1, 'email', 'alex@example.com', 'self', 'members'),
+         ($1, 'phone', '+1-608-555-0199', 'self', 'connections'),
+         ($1, 'website', 'https://example.com', 'self', 'private')`,
       [otherPersonId],
     );
     const sql = "select id from contact_points where person_id = $1";
-    expect(await asUser(db, memberUser, () => count(sql, [otherPersonId]))).toBe(0);
-
-    const [a, b] = [memberPersonId, otherPersonId].sort();
-    await db.query("insert into edges (person_a, person_b, kind) values ($1, $2, 'met')", [a, b]);
-    expect(await asUser(db, memberUser, () => count(sql, [otherPersonId]))).toBe(1);
+    expect(await asUser(db, memberUser, () => count(sql, [otherPersonId]))).toBe(3);
+    expect(await asUser(db, pendingUser, () => count("select id from contact_points"))).toBe(0);
   });
 
   it("members can't add details claiming a third-party source", async () => {

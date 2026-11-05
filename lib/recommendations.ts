@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PersonSummary } from "@/components/person";
 import { getAi } from "@/lib/ai";
+import { withDeadline } from "@/lib/ai/deadline";
 import { groupCues } from "@/lib/people";
 import type { Viewer } from "@/lib/viewer";
 
@@ -33,15 +34,24 @@ const POOL_SIZE = 60;
 const EXPLAIN_LIMIT = 10;
 const FINANCE_SECTOR = "finance";
 const INVESTING = new Set(["private-equity", "venture-capital", "asset-management", "wealth-management", "investment-banking", "finance"]);
+/** The open-to preference that says someone welcomes each goal. */
+const GOAL_PREFERENCE: Record<Goal, string> = { partners: "networking", clients: "referrals", investors: "investing", mentor: "mentoring" };
+
+/** What the viewer can do next. "save" means there's no way to reach them here yet. */
+export type NextAction = { kind: "message" | "intro"; label: string; href: string } | { kind: "save" };
 
 export interface Suggestion {
   person: PersonSummary;
-  /** Plain facts the order rests on, shown as "Evidence: …". */
+  /** Plain facts the order rests on, shown straight away (the AI line follows). */
   evidence: string[];
+  action: NextAction;
+  /** A group the viewer shares with this person, as a sentence. */
+  whyUs: string | null;
 }
 
 export interface Signals {
   id: string;
+  claimed_by_user_id?: string | null;
   seniority: string | null;
   industries: { slug: string; parent: { slug: string } | null } | null;
   positions: { start_date: string | null }[];
@@ -70,20 +80,78 @@ export function scoreForGoal(goal: Goal, person: PersonSummary, s: Signals | und
   }
 }
 
+/** Every goal means reaching out, so people that's possible with (or who welcome it) come first. Exported for tests. */
+export function isActionable(goal: Goal, person: PersonSummary, s: Signals | undefined) {
+  return Boolean(s?.claimed_by_user_id) || (person.open_to ?? []).includes(GOAL_PREFERENCE[goal]);
+}
+
+/**
+ * The warmest step open to the viewer. Only members can be messaged, and only
+ * members can accept an introduction, so someone who hasn't claimed a profile
+ * has no next step here even when a connector knows them. Exported for tests.
+ */
+export function nextActionFor(personId: string, { member, hasConnector, introOpen }: { member: boolean; hasConnector: boolean; introOpen: boolean }): NextAction {
+  if (!member) return { kind: "save" };
+  if (hasConnector && !introOpen) return { kind: "intro", label: "Ask for an introduction", href: `/introductions/new?person=${personId}` };
+  return { kind: "message", label: "Send a message", href: `/messages/new?person=${personId}` };
+}
+
+/** States a shared group as a fact; it says nothing about whether they'd want to meet. Exported for tests. */
+export function whyUsLine({ name, kind }: { name: string; kind: string }) {
+  return kind === "advisory_board" ? `You’re both on the ${name}.` : `You’re both part of ${name}.`;
+}
+
 function evidenceFor(goal: Goal, person: PersonSummary, s: Signals | undefined): string[] {
   const out: string[] = [];
-  const level = SENIORITY_LABELS[s?.seniority ?? ""];
-  if (level) out.push(level);
-  if (person.industry_name) out.push(person.industry_name);
   const market = person.metro ?? person.city;
   if (market) out.push(market);
-  const openTo = person.open_to ?? [];
-  if (goal === "mentor" && openTo.includes("mentoring")) out.push("open to mentoring");
-  if (goal === "investors" && openTo.includes("investing")) out.push("open to investing");
-  if (goal === "clients" && openTo.includes("referrals")) out.push("open to referrals");
-  if (goal === "partners" && openTo.includes("networking")) out.push("open to networking");
+  if (person.industry_name) out.push(person.industry_name);
+  const level = SENIORITY_LABELS[s?.seniority ?? ""];
+  if (level) out.push(level);
+  const preference = GOAL_PREFERENCE[goal];
+  if ((person.open_to ?? []).includes(preference)) out.push(`open to ${preference}`);
   if (person.status === "claimed" || person.status === "verified") out.push("confirmed profile");
   return out;
+}
+
+/** Which of these people have a member who could introduce the viewer. */
+async function withConnectors(db: SupabaseClient, personIds: string[]): Promise<Set<string>> {
+  const results = await Promise.all(personIds.map((id) => db.rpc("intro_connectors", { p_target: id })));
+  return new Set(personIds.filter((_, i) => results[i].data?.length));
+}
+
+/** Who the viewer already has an introduction under way for; a second request would be refused. */
+async function openIntroTargets(db: SupabaseClient, userId: string, personIds: string[]): Promise<Set<string>> {
+  if (!personIds.length) return new Set();
+  const { data } = await db
+    .from("intro_requests")
+    .select("target_person_id")
+    .eq("requester_user_id", userId)
+    .in("status", ["pending_connector", "pending_target"])
+    .in("target_person_id", personIds);
+  return new Set((data ?? []).map((row) => row.target_person_id as string));
+}
+
+/**
+ * Sentences for groups the viewer shares with these people. Members can't add
+ * themselves to a group, so a match is a recorded fact, and row-level security
+ * keeps out anyone whose profile the viewer can't see.
+ */
+async function sharedGroups(db: SupabaseClient, viewerPersonId: string | null, personIds: string[]): Promise<Map<string, string>> {
+  const lines = new Map<string, string>();
+  if (!viewerPersonId || !personIds.length) return lines;
+  const { data } = await db
+    .from("group_memberships")
+    .select("person_id, group_id, groups(name, kind)")
+    .in("person_id", [viewerPersonId, ...personIds])
+    .returns<{ person_id: string; group_id: string; groups: { name: string; kind: string } | null }[]>();
+  const mine = new Set((data ?? []).filter((row) => row.person_id === viewerPersonId).map((row) => row.group_id));
+  for (const row of data ?? []) {
+    if (row.groups && row.person_id !== viewerPersonId && mine.has(row.group_id) && !lines.has(row.person_id)) {
+      lines.set(row.person_id, whyUsLine(row.groups));
+    }
+  }
+  return lines;
 }
 
 /** Ranked suggestions for this member, goal and (optional) market. */
@@ -105,7 +173,7 @@ export async function suggestions(
   const [{ data: signals }, viewerSector] = await Promise.all([
     db
       .from("people")
-      .select("id, seniority, industries:industry_id(slug, parent:parent_id(slug)), positions(start_date)")
+      .select("id, claimed_by_user_id, seniority, industries:industry_id(slug, parent:parent_id(slug)), positions(start_date)")
       .in(
         "id",
         pool.map((p) => p.id),
@@ -124,12 +192,36 @@ export async function suggestions(
 
   // Ties go to fuller profiles (work history, a known class year), then search order.
   const completeness = (person: PersonSummary) => Math.min(byId.get(person.id)?.positions.length ?? 0, 5) + (person.grad_year ? 1 : 0);
-  return pool
-    .map((person, order) => ({ person, order, value: scoreForGoal(goal, person, byId.get(person.id), viewerSector), full: completeness(person) }))
+  const top = pool
+    .map((person, order) => ({
+      person,
+      order,
+      actionable: Number(isActionable(goal, person, byId.get(person.id))),
+      value: scoreForGoal(goal, person, byId.get(person.id), viewerSector),
+      full: completeness(person),
+    }))
     .filter((r) => r.value > 0)
-    .sort((a, b) => b.value - a.value || b.full - a.full || a.order - b.order)
+    .sort((a, b) => b.actionable - a.actionable || b.value - a.value || b.full - a.full || a.order - b.order)
     .slice(0, limit)
-    .map(({ person }) => ({ person, evidence: evidenceFor(goal, person, byId.get(person.id)) }));
+    .map(({ person }) => person);
+
+  const isMember = (person: PersonSummary) => Boolean(byId.get(person.id)?.claimed_by_user_id);
+  const memberIds = top.filter(isMember).map((p) => p.id);
+  const [connected, introOpen, shared] = await Promise.all([
+    withConnectors(db, memberIds),
+    openIntroTargets(db, viewer.userId, memberIds),
+    sharedGroups(
+      db,
+      viewer.personId,
+      top.map((p) => p.id),
+    ),
+  ]);
+  return top.map((person) => ({
+    person,
+    evidence: evidenceFor(goal, person, byId.get(person.id)),
+    action: nextActionFor(person.id, { member: isMember(person), hasConnector: connected.has(person.id), introOpen: introOpen.has(person.id) }),
+    whyUs: shared.get(person.id) ?? null,
+  }));
 }
 
 /**
@@ -169,18 +261,20 @@ export async function suggestionReasons(
       db,
       missing.map((p) => p.id),
     );
-    const { matches } = await getAi().explainMatches(
-      `I want to ${GOALS[goal].phrase}${marketLabel ? ` in ${marketLabel}` : ""}.`,
-      missing.map((p) => ({
-        personId: p.id,
-        fullName: p.full_name,
-        headline: [p.current_title, p.organization_name].filter(Boolean).join(" at ") || null,
-        city: p.metro ?? p.city,
-        industryName: p.industry_name ?? null,
-        gradYear: p.grad_year,
-        sharedContext: [],
-        groups: cues.get(p.id) ? [cues.get(p.id)!] : [],
-      })),
+    const { matches } = await withDeadline(
+      getAi().explainMatches(
+        `I want to ${GOALS[goal].phrase}${marketLabel ? ` in ${marketLabel}` : ""}.`,
+        missing.map((p) => ({
+          personId: p.id,
+          fullName: p.full_name,
+          headline: [p.current_title, p.organization_name].filter(Boolean).join(" at ") || null,
+          city: p.metro ?? p.city,
+          industryName: p.industry_name ?? null,
+          gradYear: p.grad_year,
+          sharedContext: [],
+          groups: cues.get(p.id) ? [cues.get(p.id)!] : [],
+        })),
+      ),
     );
     const written = new Map(matches.map((m) => [m.personId, m.why]));
     await db.from("recommendations").upsert(

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Icon } from "@/components/icon";
-import { EmptyState, PageTitle, PersonRow } from "@/components/person";
-import { Relevance } from "@/components/relevance";
+import { EmptyState, PageTitle } from "@/components/person";
+import { SuggestionRow } from "@/components/suggestion-row";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { GOALS, suggestionReasons, suggestions } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/server";
@@ -28,16 +28,14 @@ async function StartingPoints() {
   const [saved, cues, linkedin] = await Promise.all([savedIds(supabase, viewer.userId, ids), groupCues(supabase, ids), linkedinUrls(supabase, ids)]);
   return (
     <>
-      {people.map((person) => (
-        <div key={person.id} className="suggestion">
-          <PersonRow person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
-          <div className="pad suggestion-why">
-            <Suspense fallback={<p className="meta">Writing why they may be relevant…</p>}>
-              <Relevance reasons={reasons} personId={person.id} />
-            </Suspense>
+      {list.map((suggestion) => {
+        const { id } = suggestion.person;
+        return (
+          <div key={id} className="suggestion">
+            <SuggestionRow suggestion={suggestion} saved={saved.has(id)} cue={cues.get(id)} linkedin={linkedin.get(id)} reasons={reasons} />
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -124,9 +122,9 @@ export default function DiscoverPage() {
           <div className="notice">
             <Icon name="lock" />
             <div>
-              <strong>Your network. Your boundaries.</strong>
+              <strong>A members-only network.</strong>
               <p className="small muted">
-                Contact details follow each member’s privacy settings. Introductions always ask both sides first.
+                Contact details are visible to verified members only. Introductions always ask both sides first.
               </p>
             </div>
           </div>

@@ -41,11 +41,11 @@ export function introStatusText(d: Pick<IntroDetails, "status" | "my_role" | "co
     case "accepted":
       return "Both agreed · introduction made";
     case "declined":
-      return "Didn’t go ahead · no details were shared";
+      return "Didn’t go ahead";
     case "cancelled":
-      return "Cancelled · no details were shared";
+      return "Cancelled";
     case "expired":
-      return "Expired after 30 days · no details were shared";
+      return "Expired after 30 days";
   }
 }
 

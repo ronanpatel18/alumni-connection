@@ -62,6 +62,17 @@ export async function decideIntro(formData: FormData) {
   redirect(`/introductions/${parsed.data.intro_id}?decided=1`);
 }
 
+/** Either person introduced can record that they met; the database checks who's asking. */
+export async function recordMeeting(formData: FormData) {
+  await requireMember("/introductions");
+  const id = String(formData.get("intro_id") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/introductions");
+  const supabase = await createClient();
+  await supabase.rpc("record_intro_meeting", { p_intro: id });
+  revalidatePath(`/introductions/${id}`);
+  redirect(`/introductions/${id}`);
+}
+
 export async function cancelIntro(formData: FormData) {
   await requireMember("/introductions");
   const id = String(formData.get("intro_id") ?? "");
