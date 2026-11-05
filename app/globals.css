@@ -41,7 +41,13 @@
 }
 
 /* App-specific additions that the prototypes didn't need. */
+.avatar {
+  position: relative;
+  overflow: hidden;
+}
 .avatar img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -290,4 +296,26 @@ dialog {
   width: 14px;
   height: 14px;
   flex: none;
+}
+.section-head .chip {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  /* One scrolling row, so a tab that doesn't fit doesn't drop below the underline. */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs a {
+    flex: none;
+    white-space: nowrap;
+  }
+  .profile-heading > .od-cluster {
+    width: 100%;
+  }
+  .profile-heading > .od-cluster > * {
+    flex: none;
+  }
 }

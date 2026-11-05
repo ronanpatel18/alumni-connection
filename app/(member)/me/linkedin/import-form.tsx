@@ -66,7 +66,7 @@ export function ImportForm({ hasProfile }: { hasProfile: boolean }) {
             )}
             {state.checked > 0 && (
               <p>
-                {state.matched.length} of your {state.checked} connections {state.matched.length === 1 ? "is" : "are"} in the directory.
+                {state.matched.length} of your {state.checked} {state.checked === 1 ? "connection" : "connections"} {state.matched.length === 1 ? "is" : "are"} in the directory.
               </p>
             )}
           </div>
@@ -119,8 +119,8 @@ export function ImportForm({ hasProfile }: { hasProfile: boolean }) {
                 <strong>Found:</strong> {data.files.join(", ")}
               </p>
               <p>
-                {data.positions.length} positions · {uw.length} UW–Madison {uw.length === 1 ? "degree" : "degrees"} ·{" "}
-                {data.connections.length} connections
+                {data.positions.length} {data.positions.length === 1 ? "position" : "positions"} · {uw.length} UW–Madison {uw.length === 1 ? "degree" : "degrees"} ·{" "}
+                {data.connections.length} {data.connections.length === 1 ? "connection" : "connections"}
               </p>
             </div>
           </div>

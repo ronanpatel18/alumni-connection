@@ -33,44 +33,48 @@ async function Sources() {
           <div>Anything you edit becomes member-provided and replaces what came from other sources.</div>
         </div>
       </div>
-      <div className="table-wrap">
-        <table className="responsive">
-          <thead>
-            <tr>
-              <th>Profile detail</th>
-              <th>Current source</th>
-              <th>Updated</th>
-              <th>Control</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.field}>
-                <td>
-                  <strong>{FIELD_LABELS[row.field] ?? row.field}</strong>
-                </td>
-                <td data-label="Source">
-                  {SOURCE_LABELS[row.source] ?? row.source}
-                  {row.source_url && (
-                    <>
-                      {" · "}
-                      <a href={row.source_url} target="_blank" rel="noreferrer noopener">
-                        source
-                      </a>
-                    </>
-                  )}
-                </td>
-                <td data-label="Updated">{new Date(row.fetched_at).toLocaleDateString()}</td>
-                <td>
-                  <Link className="btn quiet" href={row.field === "contact_points" || row.field === "linkedin" ? "/me/privacy" : "/me"}>
-                    Review / correct
-                  </Link>
-                </td>
+      {rows.length === 0 ? (
+        <p className="pad small muted">Nothing has been recorded yet. Details you add to your profile will appear here with their source.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="responsive">
+            <thead>
+              <tr>
+                <th>Profile detail</th>
+                <th>Current source</th>
+                <th>Updated</th>
+                <th>Control</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.field}>
+                  <td>
+                    <strong>{FIELD_LABELS[row.field] ?? row.field}</strong>
+                  </td>
+                  <td data-label="Source">
+                    {SOURCE_LABELS[row.source] ?? row.source}
+                    {row.source_url && (
+                      <>
+                        {" · "}
+                        <a href={row.source_url} target="_blank" rel="noreferrer noopener">
+                          source
+                        </a>
+                      </>
+                    )}
+                  </td>
+                  <td data-label="Updated">{new Date(row.fetched_at).toLocaleDateString()}</td>
+                  <td>
+                    <Link className="btn quiet" href={row.field === "contact_points" || row.field === "linkedin" ? "/me/privacy" : "/me"}>
+                      Review / correct
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

@@ -196,11 +196,25 @@ async function Intro({ params, searchParams }: { params: PageProps<"/introductio
       </section>
       <aside className="right-rail stack">
         <section className="panel pad">
-          <h2 className="rail-title">What happens next</h2>
-          <p className="small muted">
-            {first(d.connector_name)} decides first; {first(d.target_name)} is asked only if they agree. Requests close after 30 days (
-            {new Date(d.expires_at).toLocaleDateString()}) if no one decides.
-          </p>
+          {isOpen(d.status) ? (
+            <>
+              <h2 className="rail-title">What happens next</h2>
+              <p className="small muted">
+                {first(d.connector_name)} decides first; {first(d.target_name)} is asked only if they agree. Requests close after 30 days (
+                {new Date(d.expires_at).toLocaleDateString()}) if no one decides.
+              </p>
+            </>
+          ) : d.status === "accepted" ? (
+            <>
+              <h2 className="rail-title">What happens next</h2>
+              <p className="small muted">The introduction is made. A short note while it’s fresh is the best way to start.</p>
+            </>
+          ) : (
+            <>
+              <h2 className="rail-title">This request is closed</h2>
+              <p className="small muted">Nothing more will happen with it. You can ask for a new introduction from their profile.</p>
+            </>
+          )}
         </section>
       </aside>
     </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { toggleSaved } from "@/app/(member)/actions";
 import { initialsFor, OPEN_TO_LABELS } from "@/lib/labels";
+import { AvatarPhoto } from "./avatar-photo";
 import { Icon } from "./icon";
 
 export interface PersonSummary {
@@ -26,9 +27,8 @@ export const isConfirmed = (status: string) => status === "claimed" || status ==
 export function Avatar({ name, photoUrl, confirmed, size }: { name: string; photoUrl?: string | null; confirmed: boolean; size?: "small" | "large" }) {
   return (
     <span className={["avatar", confirmed ? "red" : "", size ?? ""].join(" ").trim()} aria-hidden="true">
-      {/* Remote photos come from institution pages; plain <img> avoids allow-listing every host. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {photoUrl ? <img src={photoUrl} alt="" loading="lazy" /> : initialsFor(name)}
+      {initialsFor(name)}
+      {photoUrl && <AvatarPhoto src={photoUrl} />}
     </span>
   );
 }
