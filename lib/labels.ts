@@ -12,6 +12,18 @@ export const OPEN_TO_LABELS: Record<string, string> = {
   speaking: "Speaking",
 };
 
+export const SENIORITY_LABELS: Record<string, string> = {
+  entry: "Early career",
+  mid: "Mid-career",
+  senior: "Senior professional",
+  manager: "Manager",
+  director: "Director",
+  vp: "Vice president",
+  c_suite: "Executive",
+  partner: "Partner",
+  owner: "Owner or founder",
+};
+
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** "BBA, Finance" — drops a major the degree already names, fixes lowercase majors. */
@@ -48,3 +60,22 @@ export function initialsFor(name: string) {
     .map((part) => part[0].toUpperCase())
     .join("");
 }
+
+/** Why a found contact detail needs an administrator (codes from contact_findings.review_reasons). */
+export const CONTACT_REVIEW_REASON_LABELS: Record<string, string> = {
+  low_confidence: "May be someone else’s",
+  conflict: "Conflicts with another finding",
+  personal: "Personal detail",
+  third_party_phone: "Phone from a third party",
+  pattern: "Pattern-based address",
+  unverified: "Validity not confirmed",
+};
+
+/** What a validity check said (contact_findings.verification.status). */
+export const CONTACT_CHECK_LABELS: Record<string, string> = {
+  valid: "Passed a verifier",
+  domain_ok: "Mail domain works; address not individually verified",
+  risky: "Domain accepts any address; can’t be confirmed",
+  unknown: "Not checked",
+  invalid: "Failed",
+};

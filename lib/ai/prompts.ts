@@ -5,6 +5,8 @@ import type { SearchVocabulary } from "@/lib/search/parse-query";
 import { parseSearchText } from "@/lib/search/parse-query";
 import type {
   CandidateForExplanation,
+  CandidateForRanking,
+  RankedMatches,
   Enrichment,
   EnrichmentInput,
   MatchExplanations,
@@ -54,7 +56,9 @@ export function summaryStub(facts: ProfileFacts): ProfileSummary {
 }
 
 // ---------------------------------------------------------------------------
-// Search query parsing (only used when the rule-based parser recognizes nothing)
+// Search query parsing. Plain searches only reach a model when the rule-based
+// parser recognizes nothing; a prompt search ("describe who you want to meet")
+// always asks, and falls back to the rules if the model is slow or wrong.
 // ---------------------------------------------------------------------------
 
 export function querySystemPrompt(vocab: SearchVocabulary): string {
@@ -66,7 +70,13 @@ export function querySystemPrompt(vocab: SearchVocabulary): string {
 - city/state: only places from this list, else null: ${places}
 - gradYearMin/gradYearMax: graduation-year bounds if the user mentions a class or years, else null.
 - openTo: only if the user asks for people open to mentoring, hiring, investing, etc.
-- text: remaining keywords worth matching against names, titles and employers, else null.`;
+- text: remaining keywords worth matching against names, titles and employers, else null.
+- radiusMiles: only if the user gives a distance, else null.
+- seniority: career levels the user asks for, from: entry, mid, senior, manager, director, vp, c_suite, partner, owner. "Executives" is c_suite; "founders" is owner; "someone senior" is director, vp, c_suite and partner. Empty if they don't say.
+- keywords: up to 8 short terms (1-3 words each) from the request that could appear in a title, employer or specialty, such as "climate" or "venture capital". No places, years or filler words.
+- goal: one plain sentence restating what the user wants to achieve, using only what they wrote. Null if the request is just a lookup.
+
+A city the user is moving to or visiting is the city to search. Never add filters the user did not ask for.`;
 }
 
 export function queryStub(text: string, vocab: SearchVocabulary): ParsedQuery {
@@ -94,6 +104,62 @@ export function explainStub(candidates: CandidateForExplanation[]): MatchExplana
       why:
         [c.headline, c.city && `based in ${c.city}`, ...c.sharedContext].filter(Boolean).join("; ").slice(0, 240) ||
         "UW–Madison alumnus in your search results.",
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Prompt search: order the shortlist against the member's request
+// ---------------------------------------------------------------------------
+
+export const RANK_SYSTEM = `You help a UW–Madison alumnus decide whom to contact in the alumni network.
+You get the member's request and a shortlist of candidates. Return the candidates that are relevant to the request, most relevant first.
+For each, write "why": one sentence (max 25 words) on why they fit the request.
+
+Rules:
+- Use ONLY the details listed for that candidate. Never add an employer, title, place, year, degree, achievement or connection that is not listed.
+- Don't say what the candidate knows, wants, has agreed to or will do. "openTo" lists what they have said they are open to; mention it only if listed.
+- Don't repeat the candidate's name, and don't claim anything shared with the member beyond both being UW–Madison alumni.
+- Leave out candidates with no real relevance to the request rather than stretching.
+- "ref" must be copied exactly from the candidate.`;
+
+/** The candidate details the model sees, and the only text a reason may draw on. */
+export function rankingFacts(c: CandidateForRanking) {
+  return {
+    name: c.fullName,
+    title: c.title,
+    employer: c.organizationName,
+    industry: c.industryName,
+    location: [c.city, c.state].filter(Boolean).join(", ") || null,
+    uwDegree: [c.degree, c.gradYear].filter(Boolean).join(" ") || null,
+    level: c.seniority,
+    openTo: c.openTo,
+    specialties: c.specialties,
+    summary: c.summary,
+    groups: c.groups,
+  };
+}
+
+export function rankUserPrompt(request: string, candidates: CandidateForRanking[]): string {
+  const list = candidates.map((c, i) => ({ ref: `p${i + 1}`, ...rankingFacts(c) }));
+  return `Member's request: ${request}\n\nCandidates (JSON):\n${JSON.stringify(list)}`;
+}
+
+/** Fixture mode keeps the retrieval order and restates stored facts. */
+export function rankStub(candidates: CandidateForRanking[]): RankedMatches {
+  return {
+    matches: candidates.map((c, i) => ({
+      ref: `p${i + 1}`,
+      why:
+        [
+          [c.title, c.organizationName].filter(Boolean).join(" at "),
+          c.industryName && `works in ${c.industryName}`,
+          c.city && `based in ${c.city}`,
+          c.openTo.length ? `open to ${c.openTo.join(", ").replace(/_/g, " ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("; ")
+          .slice(0, 240) || "UW–Madison alumnus in your results.",
     })),
   };
 }

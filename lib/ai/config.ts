@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export type AiMode = "fixture" | "live" | "record";
 export type ChatProvider = "ollama" | "openai-compatible" | "gemini" | "anthropic";
-export type EmbedProvider = "ollama" | "openai-compatible" | "fixture";
+export type EmbedProvider = "ollama" | "openai-compatible" | "gemini" | "fixture";
 /** `extract` = short structured jobs (summaries, query parsing); `write` = prose (explanations, outreach). */
 export type AiTaskKind = "extract" | "write";
 
@@ -15,7 +15,7 @@ const envSchema = z.object({
   AI_EXTRACT_MODEL: z.string().default("gpt-oss:20b"),
   AI_WRITE_PROVIDER: z.enum(["ollama", "openai-compatible", "gemini", "anthropic"]).default("ollama"),
   AI_WRITE_MODEL: z.string().default("gpt-oss:20b"),
-  AI_EMBED_PROVIDER: z.enum(["ollama", "openai-compatible", "fixture"]).default("ollama"),
+  AI_EMBED_PROVIDER: z.enum(["ollama", "openai-compatible", "gemini", "fixture"]).default("ollama"),
   AI_EMBED_MODEL: z.string().default("bge-m3"),
   AI_EMBED_DIMENSIONS: z.coerce.number().int().positive().default(1024),
   AI_FALLBACK: z.enum(["anthropic", "none"]).default("none"),

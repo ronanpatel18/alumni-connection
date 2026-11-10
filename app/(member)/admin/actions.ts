@@ -106,3 +106,22 @@ export async function decideClaim(formData: FormData) {
   revalidatePath("/admin/claims");
   redirect(`/admin/claims?result=${result}`);
 }
+
+const contactDecisionSchema = z.object({ finding_id: z.string().uuid(), decision: z.enum(["show", "keep_private", "reject"]) });
+
+/** An administrator's decision on one found email or phone number (see admin_decide_contact_finding). */
+export async function decideContactFinding(formData: FormData) {
+  await requireAdmin("/admin/contacts");
+  const parsed = contactDecisionSchema.safeParse({ finding_id: formData.get("finding_id"), decision: formData.get("decision") });
+  if (!parsed.success) redirect("/admin/contacts?result=error");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_decide_contact_finding", {
+    p_finding_id: parsed.data.finding_id,
+    p_decision: parsed.data.decision,
+  });
+  // 22023: the database refused to show a detail that isn't a verified work detail.
+  const result = error ? (error.code === "22023" ? "not_allowed" : "error") : parsed.data.decision === "reject" ? "rejected" : ((data as { visibility?: string }).visibility === "members" ? "shown" : "kept");
+  revalidatePath("/admin/contacts");
+  redirect(`/admin/contacts?result=${result}`);
+}

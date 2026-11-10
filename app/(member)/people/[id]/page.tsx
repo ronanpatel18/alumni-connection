@@ -20,6 +20,7 @@ interface ContactPoint {
   value: string;
   source: string;
   verified_at: string | null;
+  verification: string | null;
 }
 
 interface ProfileRow {
@@ -114,7 +115,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
           "organizations:current_organization_id(name), industries:industry_id(name), " +
           "educations(id, school, degree, major, grad_year), " +
           "positions(id, title, organization_name, is_current, start_date, end_date), " +
-          "contact_points(id, kind, value, source, verified_at), group_memberships(groups(slug, name)), " +
+          "contact_points(id, kind, value, source, verified_at, verification), group_memberships(groups(slug, name)), " +
           "field_provenance(field, source, source_url, fetched_at)",
       )
       .eq("id", id)
@@ -380,7 +381,9 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
           <section className="panel pad">
             <h2 className="rail-title">Contact details</h2>
             <p className="meta" style={{ marginBottom: 20 }}>
-              {confirmed ? "Visible to all verified members." : "This profile hasn’t been claimed yet, so only details from public sources are shown."}
+              {confirmed
+                ? "Visible to all verified members."
+                : "This profile hasn’t been claimed yet, so only details from public or licensed sources that an administrator has checked are shown."}
             </p>
             <div className="detail-list">
               {CONTACT_KINDS.map(({ kind, label }) => {
@@ -402,7 +405,10 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
                           ) : (
                             <span className="small">{p.value}</span>
                           )}
-                          <span className="meta">{SOURCE_LABELS[p.source] ?? p.source}</span>
+                          <span className="meta">
+                            {SOURCE_LABELS[p.source] ?? p.source}
+                            {p.verification === "pattern_verified" && " · built from the company’s address pattern, confirmed by a verifier"}
+                          </span>
                           {p.verified_at && kind === "email" && (
                             <span className="chip success" style={{ justifySelf: "start" }}>
                               <Icon name="check" />

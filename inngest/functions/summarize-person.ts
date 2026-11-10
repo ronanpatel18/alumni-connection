@@ -28,7 +28,7 @@ export const summarizePerson = inngest.createFunction(
       const ai = getAi();
       const summary = await ai.summarizeProfile(loaded.facts);
       const [embedding] = await ai.embed([embeddingText(loaded.facts, summary.summary)]);
-      return { ...summary, embedding };
+      return { ...summary, embedding, embeddingModel: ai.embedModel };
     });
 
     await step.run("save", async () => {
@@ -38,6 +38,7 @@ export const summarizePerson = inngest.createFunction(
           ai_summary: result.summary,
           summary_input_hash: hash,
           embedding: JSON.stringify(result.embedding),
+          embedding_model: result.embeddingModel,
         })
         .eq("id", personId);
       if (error) throw error;

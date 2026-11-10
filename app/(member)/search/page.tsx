@@ -5,6 +5,7 @@ import { AutoSubmit } from "@/components/auto-submit";
 import { RememberSearch } from "@/components/back-to-search";
 import { Icon } from "@/components/icon";
 import { EmptyState, OPEN_TO_LABELS, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
+import { SearchModeTabs } from "@/components/search-mode-tabs";
 import { getAi } from "@/lib/ai";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
@@ -389,6 +390,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
         title="Find your people."
         description="Search by what you need. Refine by who, where, and how you’d like to connect."
       />
+      <SearchModeTabs current="filters" />
       <Suspense fallback={<div className="search-box" style={{ height: 62 }} />}>
         <SearchFilters searchParams={searchParams} />
       </Suspense>

@@ -56,6 +56,15 @@ const OPEN_TO_PHRASES: [string, ParsedQuery["openTo"][number]][] = [
 const OPEN_TO_ITEM = `(?:${OPEN_TO_PHRASES.map(([phrase]) => phrase).join("|")})`;
 const OPEN_TO_CLAUSE = new RegExp(`\\bopen to (${OPEN_TO_ITEM}(?: (?:and |or )?${OPEN_TO_ITEM})*)\\b`);
 
+// Career levels, read only from unambiguous plural forms. The words stay in the
+// text: "directors of marketing" is still worth matching against titles.
+const SENIORITY_PATTERNS: [RegExp, ParsedQuery["seniority"][number]][] = [
+  [/\b(executives|c-suite|ceos|cfos|coos)\b/, "c_suite"],
+  [/\b(founders|owners|entrepreneurs)\b/, "owner"],
+  [/\b(vps|vice presidents)\b/, "vp"],
+  [/\bdirectors\b/, "director"],
+];
+
 const STOPWORDS = new Set(
   ("show me find who are is the a an in near around at of for with and or people person working work works worked " +
     "folks professionals someone anyone looking to meet connect i my want need any all from based live living " +
@@ -169,6 +178,8 @@ export function parseSearchText(input: string, vocab: SearchVocabulary): RulePar
     }
   }
 
+  const seniority = SENIORITY_PATTERNS.filter(([pattern]) => pattern.test(text)).map(([, value]) => value);
+
   const leftover = text
     .split(" ")
     .map((w) => w.replace(/^[-']+|[-']+$/g, ""))
@@ -185,6 +196,9 @@ export function parseSearchText(input: string, vocab: SearchVocabulary): RulePar
       gradYearMin,
       gradYearMax,
       openTo,
+      seniority,
+      keywords: leftover.slice(0, 8).map((w) => w.slice(0, 40)),
+      goal: null,
     },
     placeId,
     needsModel: recognized === 0 && leftover.length >= 3,

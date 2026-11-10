@@ -15,9 +15,12 @@ export interface ChatBackend {
   completeJson<T>(request: JsonRequest<T>): Promise<T>;
 }
 
+/** Whether a text is a stored profile or a member's search; some models embed the two differently. */
+export type EmbedKind = "document" | "query";
+
 export interface EmbedBackend {
   readonly name: string;
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], kind?: EmbedKind): Promise<number[][]>;
 }
 
 /** The model returned JSON that failed schema validation even after a retry. */
