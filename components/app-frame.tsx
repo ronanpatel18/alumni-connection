@@ -8,7 +8,9 @@ import { Icon, type IconName } from "./icon";
 
 // The member areas from the design's navigation model; Administration shows for admins.
 const NAV: { href: string; label: string; icon: IconName; matches: string[] }[] = [
-  { href: "/discover", label: "Discover", icon: "search", matches: ["/discover", "/search", "/people"] },
+  { href: "/discover", label: "Discover", icon: "search", matches: ["/discover"] },
+  // Search, and the profiles opened from it.
+  { href: "/search", label: "People", icon: "person", matches: ["/search", "/people"] },
   { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved", "/messages", "/introductions"] },
   { href: "/trips", label: "Trips", icon: "trip", matches: ["/trips"] },
   { href: "/insights", label: "Insights", icon: "chart", matches: ["/insights"] },
@@ -104,30 +106,22 @@ export function AppFrame({
           </div>
         </aside>
         <div className="workspace">
-          <header className="topbar">
-            <span className="crumb">
-              Your network <span style={{ padding: "0 8px" }}>/</span> <b>{active?.label ?? "Discover"}</b>
-            </span>
+          {/* No page header on desktop. Phones keep a slim bar only to reach the menu. */}
+          <div className="topbar mobile-only">
             <Link className="mobile-brand" href="/discover">
               Alumni Connect<span className="accent">.</span>
             </Link>
-            <div className="top-actions">
-              <span className="trust">
-                <Icon name="lock" />
-                <span>Private. Verified alumni only.</span>
-              </span>
-              <button
-                ref={menuButton}
-                type="button"
-                className="icon-button menu-button"
-                onClick={() => setMenuOpen((open) => !open)}
-                aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-                aria-expanded={menuOpen}
-              >
-                <Icon name={menuOpen ? "close" : "menu"} />
-              </button>
-            </div>
-          </header>
+            <button
+              ref={menuButton}
+              type="button"
+              className="icon-button menu-button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={menuOpen}
+            >
+              <Icon name={menuOpen ? "close" : "menu"} />
+            </button>
+          </div>
           <main className="content" id="main" tabIndex={-1}>
             {children}
           </main>

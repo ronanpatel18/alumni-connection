@@ -161,7 +161,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
   return (
     <>
       <BackToSearch />
-      <PageTitle eyebrow="Discover / Alumni profile" />
+      <PageTitle eyebrow="People / Alumni profile" />
       {justClaimed === "1" && person.claimed_by_user_id === viewer.userId && (
         <div className="notice success" role="status" style={{ marginBottom: 24 }}>
           <Icon name="check" />

@@ -2,6 +2,7 @@
 // 24px grid, 1.6 stroke. Decorative by default; give meaning through adjacent text.
 const PATHS = {
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>',
   trip: '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M8 7v14m8-14v14"/>',
   chart: '<path d="M4 3v17h17M8 16v-5m5 5V7m5 9V4"/>',

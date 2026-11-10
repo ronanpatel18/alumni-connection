@@ -66,7 +66,7 @@ async function Shortlist({ params }: { params: PageProps<"/trips/[id]">["params"
               </div>
             </div>
           )}
-          <div className="panel">
+          <div className={people.length === 0 ? "panel" : "person-cards"}>
             {people.length === 0 ? (
               <EmptyState
                 title="No matches for this visit yet"

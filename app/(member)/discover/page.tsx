@@ -97,8 +97,8 @@ export default function DiscoverPage() {
             </div>
           </section>
 
-          <section className="panel">
-            <div className="pad" style={{ paddingBottom: 0 }}>
+          <section>
+            <div>
               <div className="section-head">
                 <div>
                   <h2>People worth knowing</h2>
@@ -114,9 +114,11 @@ export default function DiscoverPage() {
                 <Link href="/discover/who-to-meet">Change goal</Link>
               </div>
             </div>
-            <Suspense fallback={<Skeleton />}>
-              <StartingPoints />
-            </Suspense>
+            <div className="person-cards">
+              <Suspense fallback={<Skeleton />}>
+                <StartingPoints />
+              </Suspense>
+            </div>
           </section>
 
           <div className="notice">

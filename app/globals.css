@@ -57,19 +57,21 @@
   white-space: pre-line;
   color: var(--fg-2);
 }
-/* Profile timeline: a red line joins each dot to the next one. The timeline's
-   row gap is 24px and each dot's center sits 12px below its item's top. */
+/* Profile timeline: a thin, light red line joins each dot's center to the next
+   one, whatever each entry's height. The timeline's row gap is 24px and each
+   dot's center sits 12px below its item's top, so the line runs 24 + 12px past
+   the item's bottom and ends at the final dot. */
 .timeline-item {
   position: relative;
 }
 .timeline-item:not(:last-child)::before {
   content: "";
   position: absolute;
-  left: 3px;
+  left: 3.5px;
   top: 12px;
   bottom: -36px;
-  width: 2px;
-  background: var(--accent);
+  width: 1px;
+  background: color-mix(in srgb, var(--accent) 25%, var(--surface));
 }
 .timeline-dot {
   position: relative;
@@ -317,5 +319,49 @@ dialog {
   }
   .profile-heading > .od-cluster > * {
     flex: none;
+  }
+}
+/* Each person in a result list is its own card, with space between cards
+   (search, discover, saved contacts, trip shortlists). */
+.person-cards {
+  display: grid;
+  gap: 16px;
+}
+.person-cards > .person,
+.person-cards > .suggestion,
+.person-cards > .trip-candidate,
+.person-cards > [role="status"] {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+.person-cards > .person {
+  padding: 24px;
+}
+.person-cards > .trip-candidate,
+.person-cards > .suggestion {
+  border-top: 1px solid var(--border-soft);
+}
+.people-results .pagination {
+  border-top: 0;
+  padding: 16px 0;
+}
+@media (max-width: 767px) {
+  .person-cards > .person {
+    padding: 20px 16px;
+  }
+}
+/* The page header is removed; on phones a slim bar remains only to open the
+   navigation menu. */
+@media (min-width: 768px) {
+  .topbar.mobile-only {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .topbar.mobile-only {
+    min-height: 56px;
+    padding: 8px 16px;
+    justify-content: space-between;
   }
 }

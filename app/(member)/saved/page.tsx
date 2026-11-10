@@ -70,6 +70,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
 
   if (!matches.length) {
     return (
+      <div className="panel">
       <EmptyState
         title={query ? "No saved contacts match" : "No saved contacts yet"}
         text={query ? "Try another name or clear the search." : "Save someone from discovery to find them here."}
@@ -79,6 +80,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
           </Link>
         }
       />
+      </div>
     );
   }
   return (
@@ -112,7 +114,7 @@ export default function SavedPage({ searchParams }: PageProps<"/saved">) {
       <Suspense>
         <SavedSearch searchParams={searchParams} />
       </Suspense>
-      <section className="panel">
+      <section className="person-cards">
         <Suspense
           fallback={
             <div className="loading-row" role="status" aria-label="Loading saved contacts">

@@ -14,7 +14,7 @@ import { getVocabulary } from "@/lib/search/vocabulary";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 
-export const metadata: Metadata = { title: "Search" };
+export const metadata: Metadata = { title: "People" };
 
 const PAGE_SIZE = 10;
 
@@ -281,17 +281,19 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
         </div>
       )}
       <div className="split" style={{ marginTop: chips.length ? 0 : 24 }}>
-        <section className="panel">
-          <div className="section-head pad" style={{ margin: 0 }}>
+        <section className="people-results">
+          <div className="section-head">
             <h2 id="result-count">
               {f.total} {f.total === 1 ? "alumnus" : "alumni"}
             </h2>
           </div>
           {people.length ? (
             <>
-              {people.map((person) => (
-                <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
-              ))}
+              <div className="person-cards">
+                {people.map((person) => (
+                  <PersonRow key={person.id} person={person} saved={saved.has(person.id)} cue={cues.get(person.id)} linkedin={linkedin.get(person.id)} />
+                ))}
+              </div>
               <div className="pagination">
                 <span>
                   {f.confirmed} confirmed · {f.unconfirmed} unconfirmed records
@@ -322,6 +324,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
               </div>
             </>
           ) : (
+            <div className="panel">
             <EmptyState
               title={recovery?.title ?? "No matches yet"}
               text={recovery?.text ?? "Try a wider market, remove a filter, or search for a different specialty."}
@@ -331,6 +334,7 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
                 </Link>
               }
             />
+            </div>
           )}
         </section>
         <aside className="stack right-rail">
@@ -381,7 +385,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
     <>
       <RememberSearch />
       <PageTitle
-        eyebrow="Discover / Search"
+        eyebrow="People"
         title="Find your people."
         description="Search by what you need. Refine by who, where, and how you’d like to connect."
       />
