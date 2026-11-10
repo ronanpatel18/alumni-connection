@@ -132,6 +132,8 @@ export const LIMITS = {
   expensive: { limit: 5, windowSec: 60 },
   /** Directory searches (also caps bulk scraping of contact details) */
   search: { limit: 60, windowSec: 60 },
+  /** AI calls behind a prompt search (interpreting it, ordering the shortlist). Over the limit, search falls back to rules. */
+  aiSearch: { limit: 12, windowSec: 60 },
 } as const;
 
 export const rateLimiters = {

@@ -2,16 +2,18 @@
 // in config (lib/ai/config.ts); open models are the default, Claude is the
 // optional fallback, and fixture mode makes no network calls at all.
 import type { SearchVocabulary } from "@/lib/search/parse-query";
-import { AiRefusalError, AiValidationError, type ChatBackend, type EmbedBackend, type JsonRequest } from "./backend";
+import { AiRefusalError, AiValidationError, type ChatBackend, type EmbedBackend, type EmbedKind, type JsonRequest } from "./backend";
 import { AnthropicBackend } from "./backends/anthropic";
 import { FixtureChatBackend, FixtureEmbedBackend, RecordingChatBackend } from "./backends/fixture";
 import { OpenAiCompatibleBackend } from "./backends/openai-compatible";
+import { isGrounded } from "./grounding";
 import { type AiConfig, type AiTaskKind, type ChatProvider, loadAiConfig } from "./config";
 import {
   ENRICH_SYSTEM,
   EXPLAIN_SYSTEM,
   OUTREACH_SYSTEM,
   type OutreachInput,
+  RANK_SYSTEM,
   SUMMARY_SYSTEM,
   enrichStub,
   enrichUserPrompt,
@@ -21,11 +23,15 @@ import {
   outreachUserPrompt,
   querySystemPrompt,
   queryStub,
+  rankingFacts,
+  rankStub,
+  rankUserPrompt,
   summaryStub,
   summaryUserPrompt,
 } from "./prompts";
 import {
   type CandidateForExplanation,
+  type CandidateForRanking,
   type Enrichment,
   type EnrichmentInput,
   enrichmentSchema,
@@ -38,7 +44,14 @@ import {
   outreachDraftSchema,
   parsedQuerySchema,
   profileSummarySchema,
+  rankedMatchesSchema,
 } from "./schemas";
+
+/** One person in the re-ranked order. `why` is null when the model skipped them or its reason failed the fact check. */
+export interface RankedPerson {
+  personId: string;
+  why: string | null;
+}
 
 /** Summaries below this confidence are re-run on the fallback model, if one is configured. */
 const MIN_SUMMARY_CONFIDENCE = 0.5;
@@ -63,14 +76,23 @@ function liveChatBackend(config: AiConfig, provider: ChatProvider, model: string
   }
 }
 
+function requireGeminiKey(config: AiConfig): string {
+  if (!config.geminiApiKey) throw new Error("GEMINI_API_KEY is required for the gemini provider");
+  return config.geminiApiKey;
+}
+
 export interface Ai {
   readonly config: AiConfig;
   summarizeProfile(facts: ProfileFacts): Promise<ProfileSummary & { model: string }>;
   parseSearchQuery(text: string, vocab: SearchVocabulary): Promise<ParsedQuery>;
   explainMatches(goal: string, candidates: CandidateForExplanation[]): Promise<MatchExplanations>;
+  /** Orders a shortlist against the member's request, most relevant first. Everyone given comes back exactly once. */
+  rankMatches(request: string, candidates: CandidateForRanking[]): Promise<RankedPerson[]>;
   draftOutreach(input: OutreachInput): Promise<OutreachDraft>;
   extractEnrichment(input: EnrichmentInput): Promise<Enrichment & { model: string }>;
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], kind?: EmbedKind): Promise<number[][]>;
+  /** Names the vector space, so profiles embedded by another model are never compared with these. */
+  readonly embedModel: string;
 }
 
 export function createAi(config: AiConfig = loadAiConfig()): Ai {
@@ -83,12 +105,21 @@ export function createAi(config: AiConfig = loadAiConfig()): Ai {
   const embedder: EmbedBackend =
     config.mode === "fixture" || config.embed.provider === "fixture"
       ? new FixtureEmbedBackend(config.embed.dimensions)
-      : new OpenAiCompatibleBackend({
-          name: config.embed.provider,
-          baseURL: config.embed.provider === "ollama" ? config.ollamaBaseUrl : (config.openAiCompatBaseUrl ?? ""),
-          apiKey: config.openAiCompatApiKey,
-          model: config.embed.model,
-        });
+      : config.embed.provider === "gemini"
+        ? new OpenAiCompatibleBackend({
+            name: "gemini",
+            baseURL: config.geminiBaseUrl,
+            apiKey: requireGeminiKey(config),
+            model: config.embed.model,
+            dimensions: config.embed.dimensions,
+            geminiTaskPrefix: config.embed.model.startsWith("gemini-embedding-2"),
+          })
+        : new OpenAiCompatibleBackend({
+            name: config.embed.provider,
+            baseURL: config.embed.provider === "ollama" ? config.ollamaBaseUrl : (config.openAiCompatBaseUrl ?? ""),
+            apiKey: config.openAiCompatApiKey,
+            model: config.embed.model,
+          });
 
   function chatBackendFor(kind: AiTaskKind): ChatBackend {
     if (config.mode === "fixture") return new FixtureChatBackend();
@@ -143,7 +174,36 @@ export function createAi(config: AiConfig = loadAiConfig()): Ai {
         industrySlugs: result.industrySlugs.filter((slug) => knownSlugs.has(slug)),
         city: knownPlace ? result.city : null,
         state: knownPlace ? result.state : null,
+        radiusMiles: knownPlace ? result.radiusMiles : null,
+        seniority: [...new Set(result.seniority)],
+        keywords: [...new Set(result.keywords.map((k) => k.trim().toLowerCase()).filter(Boolean))],
+        goal: result.goal?.trim() || null,
       };
+    },
+
+    async rankMatches(request, candidates) {
+      if (!candidates.length) return [];
+      const { result } = await run("write", {
+        task: "rank-matches",
+        schema: rankedMatchesSchema,
+        system: RANK_SYSTEM,
+        user: rankUserPrompt(request, candidates),
+        stub: () => rankStub(candidates),
+      });
+      const byRef = new Map(candidates.map((c, i) => [`p${i + 1}`, c]));
+      const ranked: RankedPerson[] = [];
+      const seen = new Set<string>();
+      for (const match of result.matches) {
+        const candidate = byRef.get(match.ref.trim().toLowerCase());
+        if (!candidate || seen.has(candidate.personId)) continue;
+        seen.add(candidate.personId);
+        // A reason may only restate this person's facts or the member's own words.
+        const allowed = `${JSON.stringify(rankingFacts(candidate))} ${request}`;
+        ranked.push({ personId: candidate.personId, why: isGrounded(match.why, allowed) ? match.why.trim() : null });
+      }
+      // People the model left out keep their retrieval order, after the ones it chose.
+      for (const candidate of candidates) if (!seen.has(candidate.personId)) ranked.push({ personId: candidate.personId, why: null });
+      return ranked;
     },
 
     async explainMatches(goal, candidates) {
@@ -183,13 +243,15 @@ export function createAi(config: AiConfig = loadAiConfig()): Ai {
       return { ...result, model };
     },
 
-    async embed(texts) {
-      const vectors = await embedder.embed(texts);
+    embedModel: embedder.name,
+
+    async embed(texts, kind = "document") {
+      const vectors = await embedder.embed(texts, kind);
       for (const vector of vectors) {
         if (vector.length !== config.embed.dimensions) {
           throw new Error(
             `${embedder.name} returned ${vector.length}-dim embeddings; the database expects ${config.embed.dimensions}. ` +
-              "Pick a 1024-dim model (bge-m3, Qwen3-Embedding-0.6B) or migrate the column.",
+              "Pick a 1024-dim model (gemini-embedding-2 with AI_EMBED_DIMENSIONS=1024, bge-m3, Qwen3-Embedding-0.6B) or migrate the column.",
           );
         }
       }
@@ -206,5 +268,6 @@ export function getAi(): Ai {
   return shared;
 }
 
+export type { CandidateForRanking } from "./schemas";
 export type { Enrichment, EnrichmentInput, EnrichmentSource, ParsedQuery, ProfileFacts, ProfileSummary } from "./schemas";
 export { factsHash } from "./prompts";

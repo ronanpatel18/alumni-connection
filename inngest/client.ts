@@ -7,4 +7,5 @@ export const inngest = new Inngest({ id: "alumni-connect" });
 export const EVENTS = {
   summaryRequested: "people/summary.requested",
   summaryBackfill: "people/summaries.backfill",
+  embeddingsBackfill: "people/embeddings.backfill",
 } as const;

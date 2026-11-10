@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { ContactPrompt } from "@/components/contact-prompt";
 import { NoProfileNotice } from "@/components/no-profile";
 import { isConfirmed, PageTitle } from "@/components/person";
 import { ProfileTabs } from "@/components/profile-tabs";
@@ -54,6 +55,11 @@ export default function EditProfilePage() {
         description="Keep your professional story accurate. You decide which contact details to share."
       />
       <ProfileTabs />
+      <Suspense fallback={null}>
+        <div className="narrow" style={{ marginBottom: 24 }}>
+          <ContactPrompt />
+        </div>
+      </Suspense>
       <Suspense fallback={<div className="narrow panel pad"><div className="skeleton big" /><div className="skeleton" /></div>}>
         <EditProfile />
       </Suspense>

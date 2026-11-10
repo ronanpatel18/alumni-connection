@@ -6,6 +6,12 @@ export const SOURCE_LABELS: Record<string, string> = {
   institution: "Wisconsin School of Business profile page",
   web: "Public web",
   pdl: "Licensed professional data",
+  apollo: "Licensed professional data",
+  clay: "Licensed professional data",
+  hunter: "Licensed email data",
+  registry: "Professional registry",
+  linkedin: "LinkedIn",
+  people_search: "People-search site",
   ai: "AI-generated from your profile",
   admin: "Administrator",
 };

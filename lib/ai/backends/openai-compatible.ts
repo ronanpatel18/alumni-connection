@@ -3,7 +3,7 @@
 // validates with Zod and retries once with the validation error fed back.
 import OpenAI from "openai";
 import { z } from "zod";
-import { AiValidationError, type ChatBackend, type EmbedBackend, type JsonRequest } from "../backend";
+import { AiValidationError, type ChatBackend, type EmbedBackend, type EmbedKind, type JsonRequest } from "../backend";
 
 function jsonSchemaFor(schema: z.ZodType) {
   // Some OpenAI-compatible hosts reject the `$schema` meta key.
@@ -20,10 +20,21 @@ export class OpenAiCompatibleBackend implements ChatBackend, EmbedBackend {
   readonly name: string;
   private readonly client: OpenAI;
   private readonly model: string;
+  private readonly embedOptions: { dimensions?: number; geminiTaskPrefix?: boolean };
 
-  constructor(options: { name: string; baseURL: string; apiKey?: string; model: string }) {
+  constructor(options: {
+    name: string;
+    baseURL: string;
+    apiKey?: string;
+    model: string;
+    /** Ask for this many dimensions (models that can shorten their output, such as gemini-embedding-2). */
+    dimensions?: number;
+    /** gemini-embedding-2 takes its task as a text prefix rather than a parameter. */
+    geminiTaskPrefix?: boolean;
+  }) {
     this.name = `${options.name}:${options.model}`;
     this.model = options.model;
+    this.embedOptions = { dimensions: options.dimensions, geminiTaskPrefix: options.geminiTaskPrefix };
     // Ollama ignores the key but the SDK requires one. Free hosted tiers can stall
     // under load, so fail fast instead of waiting the SDK's default 10 minutes.
     this.client = new OpenAI({
@@ -73,8 +84,21 @@ export class OpenAiCompatibleBackend implements ChatBackend, EmbedBackend {
     throw new Error("unreachable");
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
-    const response = await this.client.embeddings.create({ model: this.model, input: texts });
-    return response.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+  async embed(texts: string[], kind: EmbedKind = "document"): Promise<number[][]> {
+    const input = this.embedOptions.geminiTaskPrefix
+      ? texts.map((text) => (kind === "query" ? `task: search result | query: ${text}` : `title: none | text: ${text}`))
+      : texts;
+    const response = await this.client.embeddings.create({
+      model: this.model,
+      input,
+      ...(this.embedOptions.dimensions ? { dimensions: this.embedOptions.dimensions } : {}),
+    });
+    return response.data
+      .sort((a, b) => a.index - b.index)
+      .map((d) => {
+        // Shortened vectors aren't always unit length; cosine search expects them to be.
+        const norm = Math.hypot(...d.embedding) || 1;
+        return Math.abs(norm - 1) < 1e-3 ? d.embedding : d.embedding.map((v) => v / norm);
+      });
   }
 }

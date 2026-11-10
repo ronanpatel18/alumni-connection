@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { ContactPrompt } from "@/components/contact-prompt";
 import { Icon } from "@/components/icon";
 import { EmptyState, PageTitle } from "@/components/person";
 import { SuggestionRow } from "@/components/suggestion-row";
@@ -76,6 +77,9 @@ export default function DiscoverPage() {
       />
       <div className="split">
         <div className="stack">
+          <Suspense fallback={null}>
+            <ContactPrompt />
+          </Suspense>
           <section aria-labelledby="search-label">
             <label className="search-label" id="search-label" htmlFor="discovery-search">
               Who would you like to connect with?

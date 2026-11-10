@@ -46,7 +46,7 @@ async function main() {
     const [embedding] = await ai.embed([embeddingText(loaded.facts, summary.summary)]);
     const { error: updateError } = await db
       .from("people")
-      .update({ ai_summary: summary.summary, summary_input_hash: factsHash(loaded.facts), embedding: JSON.stringify(embedding) })
+      .update({ ai_summary: summary.summary, summary_input_hash: factsHash(loaded.facts), embedding: JSON.stringify(embedding), embedding_model: ai.embedModel })
       .eq("id", id);
     if (updateError) throw updateError;
     done++;

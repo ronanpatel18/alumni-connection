@@ -21,6 +21,8 @@ export const profileSummarySchema = z.strictObject({
 });
 export type ProfileSummary = z.infer<typeof profileSummarySchema>;
 
+export const SENIORITY_VALUES = ["entry", "mid", "senior", "manager", "director", "vp", "c_suite", "partner", "owner"] as const;
+
 export const parsedQuerySchema = z.strictObject({
   text: z.string().max(200).nullable(),
   industrySlugs: z.array(z.string()).max(5),
@@ -30,8 +32,45 @@ export const parsedQuerySchema = z.strictObject({
   gradYearMin: z.number().int().min(1900).max(2100).nullable(),
   gradYearMax: z.number().int().min(1900).max(2100).nullable(),
   openTo: z.array(z.enum(OPEN_TO_VALUES)).max(5),
+  /** Career levels the member asked for ("executives", "founders"). Empty when they didn't say. */
+  seniority: z.array(z.enum(SENIORITY_VALUES)).max(5),
+  /** Short terms worth matching against titles, employers and specialties ("climate", "venture capital"). */
+  keywords: z.array(z.string().min(1).max(40)).max(8),
+  /** What the member is trying to do, in one plain sentence. Null for a plain lookup. */
+  goal: z.string().max(300).nullable(),
 });
 export type ParsedQuery = z.infer<typeof parsedQuerySchema>;
+
+/** Gemini's order for a prompt search, with one grounded reason per person. */
+export const rankedMatchesSchema = z.strictObject({
+  matches: z
+    .array(
+      z.strictObject({
+        ref: z.string().max(8),
+        why: z.string().min(1).max(240),
+      }),
+    )
+    .max(30),
+});
+export type RankedMatches = z.infer<typeof rankedMatchesSchema>;
+
+/** One person offered to the re-ranker. Every field is a stored profile fact. */
+export interface CandidateForRanking {
+  personId: string;
+  fullName: string;
+  title: string | null;
+  organizationName: string | null;
+  industryName: string | null;
+  city: string | null;
+  state: string | null;
+  gradYear: number | null;
+  degree: string | null;
+  seniority: string | null;
+  openTo: string[];
+  specialties: string[];
+  summary: string[];
+  groups: string[];
+}
 
 export const matchExplanationsSchema = z.strictObject({
   matches: z

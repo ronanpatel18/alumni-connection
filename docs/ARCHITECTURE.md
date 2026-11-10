@@ -49,7 +49,7 @@ Browser ─► Next.js (Vercel): server components + route handlers (Zod, rate l
 - `positions`: employer org, title, seniority, function, start and end dates, current flag
 - `organizations`: name, domain, NAICS industry, HQ location. Feeds the alumni business directory
 - `industries`: two-level taxonomy (NAICS sectors + custom subtags), editable by admins
-- `contact_points`: type (email, phone, website, linkedin), value, `source`, `verified_at`, `visibility` (`members|connections|private`; recorded but no longer limits reads)
+- `contact_points`: type (email, phone, website, linkedin), value, `source`, `verified_at`, `visibility` (`members|connections|private`). Member-entered details are visible to all verified members; third-party details only when `members`, which takes an administrator's approval
 - `field_provenance`: per field: source (`self|roster|pdl|web|ai`), confidence, `fetched_at`, citation URL. **Anything the member edits themselves always wins.**
 - `edges`: person_a, person_b, type (`classmate|coworker|linkedin_import|met|introduced|mentor`), weight, source, `shared_by_consent`
 - CRM layer: `saved_contacts`, `lists`, `notes` (private), `interactions` (meetings, calls, follow-ups with due dates), `intro_requests` (requester → connector → target, double opt-in status)
@@ -125,7 +125,7 @@ Legend: **E** email · **P** phone · **C** current company/title · **Y** gradu
 | **FINRA BrokerCheck**, NPI Registry (doctors), SEC EDGAR executive bios | C L, business P/address | Industry-specific; EDGAR bios often mention the degree. |
 | Company team/leadership pages | C, sometimes E | Claude web_fetch extracts these. |
 | Google Scholar / ORCID / faculty pages | C Y | Academic alumni. |
-| Search engines (Claude web_search, Exa people search, Brave/SerpAPI) for `"University of Wisconsin" site:linkedin.com/in` | LinkedIn URL, headline, C | Same approach WSBC uses: we read search-result snippets, never LinkedIn itself. |
+| Search engines (Claude web_search, Exa people search, Brave/SerpAPI) for `"University of Wisconsin" site:linkedin.com/in` | LinkedIn URL, headline, C | Same approach WSBC uses: search-result snippets first (free, cached). LinkedIn profile pages may also be read directly or through a vendor (see the allowed-sources row in Tier 3b). |
 
 ### Tier 3b: More free public-data APIs
 | API | Gives | Notes |
@@ -138,7 +138,9 @@ Legend: **E** email · **P** phone · **C** current company/title · **Y** gradu
 | **USPTO PatentsView API** | C L | Inventors with employer and city. |
 | **Census County Business Patterns** + **BLS OEWS** APIs | Market totals | Total workers and businesses by industry and metro. Shows market size, so "120 alumni in Chicago finance" can sit next to the total finance workforce there. |
 | **GeoNames** / Census Geocoder | Lat/long for cities | Free geocoding: load the US cities table into Postgres once. |
-| **Do not use:** FEC donor data (federal law bars using it for solicitation or commercial purposes), people-search sites (Spokeo, Whitepages, BeenVerified: home addresses, FCRA risk), LinkedIn-derived datasets (Bright Data, Apify actors, Coresignal LinkedIn data). After LinkedIn sued, [Proxycurl shut down in 2025](https://nubela.co/blog/goodbye-proxycurl/). | | |
+| **LinkedIn scraping and LinkedIn-derived datasets** (Bright Data, Apify actors, Coresignal, "LinkedIn email finder" tools) | C Y L, sometimes E P | **Allowed** (decided 2026-11-10; previously excluded). Recorded with its own source so it can be deleted on its own. |
+| **People-search sites** (Spokeo, Whitepages, BeenVerified and similar) | E P L | **Allowed** (decided 2026-11-10; previously excluded). Mostly personal details, so every value defaults to `private` and goes through admin review. Home addresses are not stored. |
+| **FEC donor data** (OpenFEC API, bulk files) | C L (employer, occupation, city) | **Allowed** (decided 2026-11-10; previously excluded). Holds no emails or phones; useful for confirming employer and city. |
 
 ### Tier 2b: More commercial APIs, by job
 | Job | Options |
@@ -162,28 +164,62 @@ Legend: **E** email · **P** phone · **C** current company/title · **Y** gradu
 - Profile-completeness prompts.
 - Quarterly "still at X?" confirmation emails.
 
-### Market-sizing only (manual, don't scrape)
-- LinkedIn's **UW–Madison school page → Alumni tab** filters alumni by where they live, where they work and what they do. Use it **by hand** to estimate totals per market ("~4,000 alumni in Chicago finance") and label those numbers as estimates.
-- Sales Navigator's terms forbid extracting data, so it's off-limits for seeding.
+### Market sizing
+- LinkedIn's **UW–Madison school page → Alumni tab** filters alumni by where they live, where they work and what they do. Use it to estimate totals per market ("~4,000 alumni in Chicago finance") and label those numbers as estimates. It may also be used for seeding, as may Sales Navigator.
 
 ### Rules
-- No LinkedIn scraping, and no vendors that scrape LinkedIn (some "LinkedIn email finder" tools).
+- **Allowed sources (decided 2026-11-10):** LinkedIn scraping and vendors that scrape LinkedIn; people-search sites (Spokeo, Whitepages, BeenVerified…); FEC donor data.
+- The suppression list is checked before anything else. Someone who asked to be removed is never re-added, from any source.
+- The AI never guesses or makes up an email or phone number. A value is stored only when it appears on a source page (URL and exact quote kept) or comes from a licensed provider's API.
+- Work and business contact details are preferred. Personal contact details from any third party default to `private`.
 - Personal mobile numbers are shown only if the member supplied them or opted in. Third-party phone numbers default to `private` (used only to verify identity).
 - Each record's source goes into `field_provenance`, so we can honor deletion requests and drop a source cleanly if its license ends.
 - **UW branding:** the project is associated with UW–Madison (confirmed 2026-11-03), so UW branding (motion W, Bucky, UW red, "Badgers") may be used, following UW–Madison's brand guidelines.
 
+## 3c. Contact enrichment as built (`npm run contacts`)
+
+Code: `lib/enrichment/contacts/` (extraction, validity checks, sources, decisions), `scripts/find-contacts.ts`, migration `…contact_enrichment`, review at `/admin/contacts`.
+
+- **No model anywhere.** Emails and phones are read with patterns, kept only when their quote is on the source page or they came from a licensed API, and attributed only when the page names the person beside the value.
+- **Order:** suppression list → free public sources → licensed APIs whose key is set → proof → validity → store privately or queue for review.
+- **Shown to members only after an administrator approves**, and only work details that passed a validity check. A pattern-built work address needs a verifier's "valid" and is labeled as such.
+- **Not worked around:** sign-in walls, bot checks and CAPTCHAs. LinkedIn profile pages and most people-search result pages are behind them, so the free path reads search snippets and whatever a plain page fetch returns. Reliable coverage of either needs a scraping vendor (stub adapter).
+- **Per-source deletion:** `delete_contacts_from_source(source, source_detail)`.
+
+### Sources and cost
+
+Prices are from vendor pages as remembered in late 2026 and earlier estimates in this document; **confirm each before buying**.
+
+| Source | Gives | Status | Cost |
+|---|---|---|---|
+| Members themselves (claim flow, `/me/privacy`, prompt on Discover and profile) | E P, highest quality | Built | $0 |
+| Company and public web pages, registries, university pages (via SearXNG) | work E P | Built | $0 |
+| NPI Registry API | practice P (health care) | Built | $0 |
+| LinkedIn search snippets | rarely E P | Built | $0 |
+| People-search sites (snippets and unblocked pages) | personal E P; always private and reviewed | Built | $0 |
+| FEC (OpenFEC) | employer and city check only; nothing stored | Built, needs free `FEC_API_KEY` | $0 |
+| Hunter.io finder + verifier | work E | Built, needs `HUNTER_API_KEY` | Free plan: a few dozen lookups a month; paid from about $34–49/month |
+| Email verifier (ZeroBounce / MillionVerifier / NeverBounce) | validity | Built, needs a key | ZeroBounce about 100 free a month; otherwise about $0.004–0.01 per email |
+| Twilio Lookup | phone validity; line type | Built, needs keys | Basic lookup free; line type about $0.008 per number |
+| People Data Labs | work E, some P, employer, title | Stub | About 100 free records a month; about $0.28 per record on Pro ($98/month for 350) |
+| Apollo.io | work E, mobile P | Stub | Free plan with few credits; paid seats from about $49–59/month, mobile numbers cost extra credits |
+| Clay (waterfall over many providers) | E P | Stub | About 100 free credits a month; about $0.05–0.20 per found contact; plans from about $149/month |
+| LinkedIn vendors (Bright Data, Apify, Coresignal) | profile data, rarely E P | Stub | Usage-based, roughly a few dollars per 1,000 profiles |
+
+**Recommendation:** spend nothing yet. (1) Push member self-entry: it's free and the only source shown without review. (2) Add free keys for Hunter and one verifier and run the 66 pilot profiles. (3) Only if that leaves gaps on profiles that matter, buy one month of People Data Labs Pro for the missing ones, then Clay for whoever is still missing. Skip Apollo unless a seat already exists, and skip LinkedIn vendors for contact details: they add little email or phone data.
+
 ## 4. LinkedIn: what's actually possible
-- **There is no API for anyone's LinkedIn connections**, and scraping breaks LinkedIn's terms. Don't build on it, and don't use vendors that scrape LinkedIn.
+- **There is no API for anyone's LinkedIn connections.** Scraping LinkedIn, and using vendors that scrape it, is allowed for profile data (decided 2026-11-10); it is against LinkedIn's terms, so expect blocking and keep it deletable by source.
 - **Sign In with LinkedIn (OpenID Connect)** gives only name, email and photo. It's useful as a login option and as a light identity signal.
 - **"Who do I already know" works this way instead:** a member uploads their own LinkedIn data export (`Connections.csv`). We match those rows to directory profiles and create `linkedin_import` edges that only that member can see, unless they choose to share them. They can delete the upload anytime.
-- Public profile URLs are found with web search, as WSBC does.
+- Public profile URLs are found with web search, as WSBC does; the profile itself may then be read directly or through a vendor.
 
 ## 5. Authentication and verification
 - **Supabase Auth:** email magic link, Google, and LinkedIn OIDC. Add SAML SSO if the school offers an alumni login.
 - **Proving someone is an alumnus**, in this order: (1) **claim a seeded profile** (WSBC lookup/claim flow, strengthened with an emailed code to an email we have on file, or admin approval); (2) match against the institution's roster; (3) alumni or `.edu` email domain; (4) manual admin queue.
 - **Roles:** `pending`, `member` (verified), `chapter_leader`, `admin`, `super_admin`. RLS rules:
   - Only verified members can read profiles.
-  - Every contact detail is visible to all verified members. The `visibility` column is kept but no longer limits reads.
+  - Contact details a member entered themselves are visible to all verified members. Details from any third party are visible only once their `visibility` is `members`, which for enrichment findings takes an administrator's approval (`/admin/contacts`). Findings awaiting a decision (`contact_findings`) are readable by administrators only.
   - Notes are private to their author.
   - Admins get audit logs.
 - **Unclaimed profiles:** a public "Is this you? Claim or remove" page. Removal takes one click and adds the person to the suppression list.
@@ -259,6 +295,7 @@ All prompts and schemas live in `lib/ai/`. We build a small **eval set**: about 
 
 ## 7. Privacy and compliance (needs a legal review before seeding)
 - Seeded profiles with contact details of people who never signed up may count as **data-broker activity** under California's Delete Act (and its DROP deletion platform) and other state privacy laws. Contact data from the school's records may fall under **FERPA "directory information"** rules. Get counsel to sign off on the seeding scope and the data agreement with the school.
+- The sources allowed on 2026-11-10 each carry a known legal constraint for that review: LinkedIn's terms forbid scraping; people-search sites forbid FCRA-covered uses (employment, credit, tenant screening) and usually automated access; federal law (52 U.S.C. § 30111(a)(4)) bars using FEC contributor data to solicit contributions or for commercial purposes.
 - **Mitigations built in from day one:**
   - Profiles are visible only to verified members, never public or indexed by search engines.
   - Every field records where it came from.
@@ -342,7 +379,7 @@ Data and backend work (Phase 0–1 schema, enrichment, auth) doesn't wait on des
   - Saved contacts and notes.
   - Admin review queue.
 - **Phase 2 (intelligence):**
-  - Natural-language search.
+  - Natural-language search. **Built** (`/search/ask`, `lib/search/ask*.ts`, `search_people_hybrid`, migration `…hybrid_search`): Gemini reads a described goal into editable filters; hybrid retrieval over filters, full-text and pgvector; an AI re-rank with one reason per person, fact-checked in code (`lib/ai/grounding.ts`). The rule parser is the free path and the fallback.
   - Relevance ranking with "why". **Built** (`lib/recommendations.ts`, `/discover/who-to-meet`): rule-based order per goal, AI writes the reason only.
   - LinkedIn CSV import and mutual connections. **Built** (`/me/linkedin`, migration `…1500_linkedin_import`): the export is parsed in the browser; matches go to a private `my_connections` table rather than `edges`, so members without a claimed profile can use it.
   - Intro engine. **Built** (double opt-in with consent events; migration `…1300_introductions`); 2-hop paths will use `edges` as members import connections.
@@ -435,7 +472,7 @@ Members use it free, so a sponsor pays these costs: WFAA, a school or college, a
 - **Database tests without Docker:** `tests/db/harness.ts` runs the real migrations and seed in PGlite (Postgres compiled to WebAssembly, with PostGIS, pgvector and pg_trgm). A small shim supplies Supabase's `auth` schema and API roles. RLS and search are tested there, and CI also applies the migrations to real Supabase Postgres.
 - **Search** is two SQL functions, `search_people` and `search_facets`, both SECURITY INVOKER, so RLS always applies. Free text goes through the rule-based parser in `lib/search/parse-query.ts` first; a model is called only when that parser recognizes nothing.
 - **Places** start with 42 US cities in a migration. Phase 1 swaps in the full GeoNames table.
-- **Embeddings** are `vector(1024)` to match bge-m3 and Qwen3-Embedding-0.6B. The AI layer refuses vectors of any other size.
+- **Embeddings** are `vector(1024)` to match bge-m3 and Qwen3-Embedding-0.6B. The AI layer refuses vectors of any other size. In use (2026-11-10): Gemini's free `gemini-embedding-2` with `dimensions=1024` through its OpenAI-compatible endpoint, which returns unit-length vectors (checked with a live call), so no column migration was needed. `people.embedding_model` records which model embedded each profile; search only compares like with like.
 - **Inngest locally** needs `INNGEST_DEV=1`.
 - **First real data (2026-11-03):** 66 living members of the Wisconsin School of Business advisory boards: External Advisory Board, Wisconsin Naming Partners and Wisconsin Business Alumni Board, plus their cross-listed center boards. They're read from business.wisc.edu, which is behind a Cloudflare bot check, so the page was read in a browser and saved as `data/sources/wsb-advisory-boards-2026-11-03.json`. Refreshing it later means re-reading the page that way, or asking WSB for an export.
 - **Runtime AI is a free model from models.dev:** DeepSeek V4.1 Flash on NVIDIA's API, through the `openai-compatible` provider. Enrichment requires a verbatim evidence quote for every fact, checked in code before anything is saved.

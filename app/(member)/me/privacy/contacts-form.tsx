@@ -49,7 +49,8 @@ export function ContactsForm({ rows }: { rows: ContactRow[] }) {
       <h2>Contact details</h2>
       <p className="small muted" style={{ margin: "12px 0 24px" }}>
         Everything here is visible to all verified members, meaning alumni who have completed verification. Leave a field blank to keep it off
-        your profile.
+        your profile. What you enter replaces anything found from public sources, and is the only kind of contact detail shown without
+        an administrator’s review.
       </p>
       {state.status !== "idle" && (
         <div className={`notice ${state.status === "saved" ? "success" : "error"}`} role={state.status === "saved" ? "status" : "alert"} style={{ marginBottom: 24 }}>

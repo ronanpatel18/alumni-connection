@@ -55,6 +55,7 @@ export class FixtureEmbedBackend implements EmbedBackend {
 
   constructor(private readonly dimensions: number) {}
 
+  // The kind is ignored: profiles and searches share one hashed space.
   async embed(texts: string[]): Promise<number[][]> {
     return texts.map((text) => {
       const vector = new Array<number>(this.dimensions).fill(0);

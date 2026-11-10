@@ -100,9 +100,11 @@ it like a password file.
 - **Edit profile:** name, role, employer, city, industry, UW degree and class
   year, what they're open to, and a short bio. A new role moves the old one to
   history.
-- **Privacy & visibility:** email, phone, website and LinkedIn, all visible to
-  every verified member. Leaving a field blank removes it. Changing an email
-  clears its verified label until it's checked again.
+- **Privacy & visibility:** email, phone, website and LinkedIn. What a member
+  enters is visible to every verified member. Leaving a field blank removes it.
+  Changing an email clears its verified label until it's checked again.
+  Members who haven't added their own email or phone see a prompt on Discover
+  and on their profile.
 - **Data sources:** where each field came from.
 
 Member edits are recorded as source `self` and always win over imported or AI
@@ -173,7 +175,8 @@ npm run linkedin -- --write # saves it
 ```
 
 Works the way wsbcconnect did: through LinkedIn's public search snippets (via
-SearXNG, or Tavily), never by fetching or scraping LinkedIn (that breaks LinkedIn's terms).
+SearXNG, or Tavily). This script doesn't fetch LinkedIn itself, though scraping
+LinkedIn and vendors that scrape it are allowed (docs/ARCHITECTURE.md §3b).
 For each unclaimed profile it finds the LinkedIn URL if missing (wsbcconnect's
 "Name Title Company linkedin" search and scoring, plus: the result's title must
 carry their first and last name and it must mention their employer), then reads
@@ -183,7 +186,92 @@ one. Snippets are cached for a week in `data/private/`, so a dry run and the
 saving run use the free search quota once. Profiles show a LinkedIn icon by the
 name and a "Connect on LinkedIn" button, as on wsbcconnect.
 
+### Prompt search ("describe who you want to meet")
+
+`/search/ask` (the second tab on People). A member writes what they're working
+toward; they get up to 30 suggested people, each with the facts it rests on and
+an "AI-generated relevance" line.
+
+1. **Intent.** Gemini turns the request into filters (industries, city and
+   radius, class years, open-to, career level, keywords) and a one-sentence
+   goal. The rule parser in `lib/search/parse-query.ts` reads the same request
+   for free and is the fallback when the model is slow (8 s), rate-limited or
+   returns invalid JSON.
+2. **Retrieval.** `search_people_hybrid` merges filters, full-text and pgvector
+   similarity. Location and "confirmed only" are strict; the other filters are
+   preferences, so a strong keyword or semantic match can still appear. Profiles
+   without an embedding still match on filters and text.
+3. **Re-ranking.** Gemini orders the shortlist against the request and writes
+   one reason each from that profile's own facts. A reason naming a number or
+   proper noun that is in neither the profile nor the member's request is
+   dropped in code (`lib/ai/grounding.ts`).
+
+The list shows at once in retrieval order and is replaced by the AI's order when
+it arrives. Understood filters are chips: remove one, or open "Adjust what was
+understood". No scores are shown, and counts split confirmed from unconfirmed.
+Interpretations and reasons are cached per member for 7 days; AI calls are
+limited to 12 a minute per member, after which search uses the rules.
+
+Embeddings are Gemini's free `gemini-embedding-2`, shortened to the column's
+1024 dimensions. After setting `AI_EMBED_PROVIDER=gemini` (see `.env.example`):
+
+```bash
+npm run embeddings
+```
+
+Outside local development, send the `people/embeddings.backfill` event to
+Inngest instead. Profiles embedded by a different model are ignored by search
+until they're redone, so run it again after changing the model.
+
+### Contact details (emails and phone numbers)
+
+```bash
+npm run contacts            # dry run: what it found, where, and what it would do
+npm run contacts -- --write # saves it
+```
+
+Run `npm run org-domains -- --write` first: it fills each employer's web
+domain (one search per employer, accepted only when the domain is plainly the
+employer's name; the rest are left blank to set by hand). Hunter and the
+company-page search need a domain to work well.
+
+Also `--names "A,B"`, `--group <slug>`, `--limit N` and `--sources "id,id"`.
+Needs SearXNG (`npm run search:start`). For each unclaimed profile:
+
+1. **Suppression first.** Anyone on the suppression list is skipped before any
+   source is asked, and the database refuses a third-party email whose hash is
+   on the list.
+2. **Sources, in order.** Company and public web pages; professional registries
+   and university pages (State Bar of Wisconsin, DSPS, FINRA BrokerCheck, SEC,
+   wisc.edu); the NPI Registry API (practice phone, health care only); LinkedIn
+   search snippets; people-search sites; then licensed APIs whose key is set
+   (Hunter). People Data Labs, Apollo, Clay and LinkedIn vendors are stub
+   adapters that stay off. Sign-in walls, bot checks and CAPTCHAs are never
+   worked around: a blocked page is skipped.
+3. **Proof.** No AI is involved. Values are read with patterns, kept only if
+   their quote is on the source page (or they came from a licensed API), and
+   attributed to a person only when the page names them beside the value.
+4. **Validity.** Emails are checked by the first verifier whose key is set
+   (ZeroBounce, MillionVerifier, NeverBounce, Hunter), otherwise by mail-domain
+   lookup only. A work address built from a company's pattern is kept only when
+   a verifier says "valid", and is labeled as pattern-based.
+5. **Decision.** A confident, verified work detail is stored as a **private**
+   contact detail (used to match a claim). Anything uncertain, personal,
+   conflicting, pattern-based or a third-party phone waits for an administrator
+   and is stored nowhere else. Either way, no member sees it until an
+   administrator chooses "Show to members" at `/admin/contacts`, which only
+   work details that passed a validity check can be.
+
+Every value records its source (`contact_points.source`, `source_detail`,
+`source_url`, and `field_provenance`). To drop everything one source
+contributed, run `select delete_contacts_from_source('people_search')` (or with
+a second argument such as `'spokeo.com'`) as the service role.
+
 ### Administration (`/admin`, administrators only)
+
+- **Contact details:** emails and phone numbers the contact pipeline found,
+  each with its source, the exact text it was read from and its validity
+  check. Show to members, keep private, or reject.
 
 - **Profile review:** unclaimed profiles with a missing class year, unconfirmed
   UW degree, incomplete role, or missing location or industry, most gaps
@@ -239,6 +327,9 @@ npm run inngest:dev
 | `npm run deploy:db` | Apply migrations to the hosted Supabase project and copy the directory data ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
 | `npm run search:start` / `search:stop` | Start or stop the self-hosted SearXNG search engine (Docker) |
 | `npm run linkedin -- [--write] [--names "A,B"]` | LinkedIn URL, location, work history and UW degrees from search snippets (dry run unless `--write`) |
+| `npm run embeddings -- [--limit N] [--force]` | Local only: embed profiles for prompt search (those with no embedding, or one from another model) |
+| `npm run org-domains -- [--write] [--names "A,B"] [--limit N]` | Fill missing employer web domains from search results (dry run unless `--write`) |
+| `npm run contacts -- [--write] [--names "A,B"] [--group slug] [--limit N] [--sources "id,id"]` | Find work emails and phones from public pages and licensed APIs, with proof and review (dry run unless `--write`) |
 
 ## Project layout
 
@@ -256,6 +347,8 @@ supabase/seed.sql       empty (real people come from importers)
 data/sources/           source snapshots for importers (e.g. WSB advisory boards)
 lib/importers/          snapshot → directory rows
 lib/enrichment/         evidence verification and web search
+lib/enrichment/contacts/ contact pipeline: extraction, validity checks, sources, decisions
+lib/search/ask*.ts      prompt search: filters and chips, intent, shortlist, re-ranking
 design/                 Open Design system package and prototypes
 tests/db/               PGlite harness + RLS and search tests
 tests/unit/             parser and AI-layer tests
@@ -321,10 +414,21 @@ running the app against local Supabase (needs Docker).
   whoever is next. Emails go to the local Mailpit inbox in development and
   through Resend (`RESEND_API_KEY`, `EMAIL_FROM`) in production; the
   `notifications` table is the outbox.
+- Built: **prompt search** (`/search/ask`): Gemini reads a described goal into
+  editable filters, hybrid retrieval (filters + full-text + pgvector), and an
+  AI re-rank with one fact-checked reason per person. Falls back to the rule
+  parser and plain retrieval order whenever the AI is slow, limited or wrong.
+- Built: **contact enrichment** (`npm run contacts`, `/admin/contacts`): free
+  public sources and Hunter's free tier, proof and validity checks, private
+  storage and administrator approval before anything is shown. Paid providers
+  (People Data Labs, Apollo, Clay, LinkedIn vendors) are stub adapters; see the
+  cost table in docs/ARCHITECTURE.md §3c. Not yet exercised with real keys:
+  Hunter, the email verifiers, Twilio Lookup and FEC.
 - Deployment: see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (Vercel + hosted Supabase;
   `npm run deploy:db` sets up the hosted database).
 
 **Phase 1, still to build:**
   - Roster CSV import.
-  - Enrichment pipeline v1 (People Data Labs + web verification).
+  - Enrichment pipeline v1 (People Data Labs + web verification); the contact
+    part is built, with People Data Labs as a stub.
   - Full GeoNames city table.
