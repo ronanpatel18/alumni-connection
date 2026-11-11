@@ -219,8 +219,9 @@ Embeddings are Gemini's free `gemini-embedding-2`, shortened to the column's
 npm run embeddings
 ```
 
-Outside local development, send the `people/embeddings.backfill` event to
-Inngest instead. Profiles embedded by a different model are ignored by search
+Outside local development an hourly Inngest job (`keep-profiles-current`) does
+this for new profiles on its own; send the `people/embeddings.backfill` event to
+redo them all. Profiles embedded by a different model are ignored by search
 until they're redone, so run it again after changing the model.
 
 ### Contact details (emails and phone numbers)

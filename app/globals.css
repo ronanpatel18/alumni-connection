@@ -365,3 +365,36 @@ dialog {
     justify-content: space-between;
   }
 }
+/* Icons inside a control always take the control's own text colour and a fixed
+   size. Container rules such as `.search-box .od-icon` (accent) or
+   `.empty .od-icon` (32px, muted) are meant for the container's own icon; left
+   alone they recolour a button's arrow to the button's fill, hiding it. */
+.btn .od-icon,
+.icon-button .od-icon,
+.filter-chip .od-icon,
+.tabs .od-icon,
+.nav-item .od-icon {
+  --od-icon-size: 20px;
+  color: currentColor;
+  stroke: currentColor;
+  margin: 0;
+  flex: none;
+}
+.btn .od-icon {
+  --od-icon-size: 18px;
+}
+.filter-chip .od-icon {
+  --od-icon-size: 14px;
+}
+/* Brand mark: the "a" and its dot sit on one line, and the name never wraps. */
+.brand-symbol {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  width: auto;
+  min-width: 36px;
+  white-space: nowrap;
+}
+.brand-name {
+  white-space: nowrap;
+}
