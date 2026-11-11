@@ -12,7 +12,8 @@ export const metadata: Metadata = { title: "New message" };
 
 async function Compose({ searchParams }: { searchParams: PageProps<"/messages/new">["searchParams"] }) {
   const viewer = await requireMember("/messages");
-  const { person } = await searchParams;
+  const { person, subject } = await searchParams;
+  const about = typeof subject === "string" ? subject.trim().slice(0, 200) : "";
   if (typeof person !== "string" || !/^[0-9a-f-]{36}$/i.test(person)) notFound();
   const supabase = await createClient();
   const { data: target } = await supabase
@@ -44,7 +45,7 @@ async function Compose({ searchParams }: { searchParams: PageProps<"/messages/ne
   return (
     <section className="panel pad narrow">
       <h2 style={{ marginBottom: 16 }}>To {target.full_name}</h2>
-      <ComposeForm personId={target.id} recipientName={target.full_name} subject="A hello from a fellow Wisconsin alum" />
+      <ComposeForm personId={target.id} recipientName={target.full_name} subject={about || "A hello from a fellow Wisconsin alum"} />
     </section>
   );
 }

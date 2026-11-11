@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
-import { EVENTS, inngest } from "@/inngest/client";
-import { getAi } from "@/lib/ai";
 import { searchConfigured } from "@/lib/enrichment/providers";
-import { type AddResult, addPeopleByName, LOOKUP_PROVIDER, runPersonLookup } from "@/lib/enrichment/save-person";
+import { type AddResult, addPeopleByName } from "@/lib/enrichment/save-person";
+import { queueLookups, startLookups } from "@/lib/enrichment/start-lookups";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizeString } from "@/lib/validation";
 import { requireAdmin } from "@/lib/viewer";
@@ -13,35 +11,6 @@ import { requireAdmin } from "@/lib/viewer";
 const MAX_NAMES = 25;
 
 export type AddPeopleState = { status: "idle" } | { status: "error"; message: string } | { status: "done"; results: AddResult[] };
-
-interface Lookup {
-  personId: string;
-  jobId: string;
-}
-
-/**
- * Hands lookups to the background queue (Inngest). Where no queue is
- * reachable, they run here after the response is sent, two at a time.
- */
-async function startLookups(lookups: Lookup[], hint: string | null) {
-  if (!lookups.length) return;
-  try {
-    await Promise.race([
-      inngest.send(lookups.map((l) => ({ name: EVENTS.personLookup, data: { ...l, hint } }))),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("queue timeout")), 4000)),
-    ]);
-  } catch {
-    after(async () => {
-      const db = createAdminClient();
-      const queue = [...lookups];
-      await Promise.all(
-        Array.from({ length: 2 }, async () => {
-          for (let next = queue.shift(); next; next = queue.shift()) await runPersonLookup(db, getAi(), { ...next, hint });
-        }),
-      );
-    });
-  }
-}
 
 /** Creates a profile for each new name and starts finding their class year, work history and location. */
 export async function addPeople(_prev: AddPeopleState, formData: FormData): Promise<AddPeopleState> {
@@ -75,11 +44,6 @@ export async function searchAgain(formData: FormData) {
   const personId = String(formData.get("person_id") ?? "");
   const hint = sanitizeString(String(formData.get("hint") ?? "")).slice(0, 200) || null;
   if (!/^[0-9a-f-]{36}$/i.test(personId)) return;
-  const { data: job } = await createAdminClient()
-    .from("enrichment_jobs")
-    .insert({ person_id: personId, kind: "full", status: "queued", provider: LOOKUP_PROVIDER })
-    .select("id")
-    .single<{ id: string }>();
-  if (job) await startLookups([{ personId, jobId: job.id }], hint);
+  await startLookups(await queueLookups([personId]), hint);
   revalidatePath("/admin/people");
 }

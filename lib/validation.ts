@@ -43,6 +43,13 @@ export const optionalText = (max: number) =>
 
 export const uuidSchema = z.uuid();
 
+/** An optional web link typed into a form: empty, or starting with http(s)://. */
+export const linkSchema = z
+  .string()
+  .max(500)
+  .trim()
+  .refine((v) => v === "" || /^https?:\/\/[^\s]+\.[^\s]+$/i.test(v), "Links need to start with https://");
+
 /** Validates a JSON request body. Returns [data, null] or [null, errorResponse]. */
 export async function validateBody<T extends z.ZodType>(
   request: Request,

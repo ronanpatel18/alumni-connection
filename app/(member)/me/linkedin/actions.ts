@@ -102,3 +102,11 @@ export async function removeImportedConnections() {
   await supabase.from("my_connections").delete().eq("owner_user_id", viewer.userId);
   revalidatePath("/me/linkedin");
 }
+
+/** Lets other members ask this member for introductions to their imported connections, or stops it. */
+export async function setShareConnections(formData: FormData) {
+  await requireMember("/me/linkedin");
+  const supabase = await createClient();
+  await supabase.rpc("set_share_connections", { p_share: formData.get("share") === "true" });
+  revalidatePath("/me/linkedin");
+}
