@@ -176,6 +176,16 @@ Legend: **E** email · **P** phone · **C** current company/title · **Y** gradu
 - Each record's source goes into `field_provenance`, so we can honor deletion requests and drop a source cleanly if its license ends.
 - **UW branding:** the project is associated with UW–Madison (confirmed 2026-11-03), so UW branding (motion W, Bucky, UW red, "Badgers") may be used, following UW–Madison's brand guidelines.
 
+## 3b-2. Adding people by name, as built (`/admin/people`, `npm run add-people`)
+
+Code: `lib/enrichment/providers.ts` (search providers), `person-lookup.ts` (name → facts), `save-person.ts` (profile and database writes), `inngest/functions/lookup-person.ts`, `app/(member)/admin/people/`.
+
+- **Search providers:** Keenable, Serper, Exa, Linkup and Parallel, each on its free allowance, plus Tavily and self-hosted SearXNG. Bulk scripts take turns between them (`spread: "one"`); a by-name lookup asks all of them at once and merges the results (`spread: "all"`). A provider that is out of credit or rate-limited sits out and the others carry on.
+- **Lookup:** three searches per person (pages tying the name to UW–Madison, UW–Madison's own sites, LinkedIn profiles as the providers index them). A page is used only if it has the person's full name plus UW–Madison or the administrator's hint. Two LinkedIn profiles that fit equally well are both left out.
+- **Facts:** class years from plain patterns (`class-year.ts`) and the model; work history and location from the model and LinkedIn's layout. Every model fact needs a quote found in its source. A job counts as current only on a LinkedIn profile or a page published in the last two years.
+- **Saving:** only gaps are filled on unclaimed profiles; anything an administrator or member set stays. The suppression list is checked before a profile is created. Each lookup is an `enrichment_jobs` row (`provider = web-lookup`) that the admin page reads.
+- **Running:** Inngest (`people/lookup.requested`) when it's reachable; otherwise the server action runs the lookups after its response (`after()`).
+
 ## 3c. Contact enrichment as built (`npm run contacts`)
 
 Code: `lib/enrichment/contacts/` (extraction, validity checks, sources, decisions), `scripts/find-contacts.ts`, migration `…contact_enrichment`, review at `/admin/contacts`.

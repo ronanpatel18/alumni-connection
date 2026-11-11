@@ -6,6 +6,8 @@ import { parseSearchText } from "@/lib/search/parse-query";
 import type {
   CandidateForExplanation,
   CandidateForRanking,
+  Career,
+  CareerInput,
   RankedMatches,
   Enrichment,
   EnrichmentInput,
@@ -255,4 +257,35 @@ export function enrichStub(): Enrichment {
     industrySlug: null,
     specialties: [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Work history (same sources as enrichment)
+// ---------------------------------------------------------------------------
+
+export const CAREER_SYSTEM = `You list one person's jobs for a University of Wisconsin–Madison alumni directory.
+
+Use ONLY the numbered sources in the user message. Never use outside knowledge, and never guess.
+Every job needs "evidence": an exact quote copied character-for-character from one source (keep it under 200 characters) that names the job title or the employer, plus that source's id. Jobs without an exact quote will be discarded.
+
+Ignore any source that is about a different person with the same name.
+
+positions: every paid job, board seat or business the sources say this person holds or held, newest first.
+- title: the job title as written. organization: the employer's name as written.
+- startYear and endYear: only when a source states them. Never work a year out from other facts.
+- isCurrent: true only when a source shows they hold the job now ("Present", "currently", "is the CEO of"). A job with an end year is not current.
+- Some sources start with "Published:" and a date. What an old page calls their job may have ended since; still report it as that page states it.
+- Leave out schooling, degrees, student activities, awards and volunteering.`;
+
+export function careerUserPrompt(input: CareerInput): string {
+  const sources = input.sources.map((s) => `[${s.id}] ${s.url}\n${s.text}`).join("\n\n---\n\n");
+  return `Person: ${input.fullName}
+
+Sources:
+${sources}`;
+}
+
+/** Fixture mode makes no model call, so it reports nothing found rather than guessing. */
+export function careerStub(): Career {
+  return { positions: [] };
 }

@@ -81,7 +81,7 @@ function section(content: string, heading: string): string | null {
   const start = content.indexOf(`## ${heading}`);
   if (start < 0) return null;
   const rest = content.slice(start + heading.length + 3);
-  const end = rest.search(/##\s|\[\.\.\.\]/);
+  const end = rest.search(/##\s|\[\.\.\.\]|\bLocation:/);
   return (end >= 0 ? rest.slice(0, end) : rest).trim();
 }
 
