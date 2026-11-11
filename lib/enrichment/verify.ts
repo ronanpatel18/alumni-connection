@@ -61,7 +61,7 @@ export function normalizeForMatch(text: string): string {
     .trim();
 }
 
-function findSource(quote: string | null, sourceId: string | null, sources: EnrichmentSource[]): EnrichmentSource | null {
+export function findSource(quote: string | null, sourceId: string | null, sources: EnrichmentSource[]): EnrichmentSource | null {
   if (!quote || normalizeForMatch(quote).length < 4) return null;
   const needle = normalizeForMatch(quote);
   const preferred = sources.find((s) => s.id === sourceId);

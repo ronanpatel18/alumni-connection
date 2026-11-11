@@ -17,6 +17,9 @@ const DEGREE = String.raw`(B\.?B\.?A|M\.?B\.?A|B\.?S\.?E|B\.?S|B\.?A|M\.?S|M\.?A
 const NOT_THEIR_DEGREE = [
   /\bhonorary\b/i, // honorary degrees aren't alumni status
   /\b(wife|husband|spouse|son|daughter|father|mother|brother|sister|children|parents?|grand\w+)\b/i, // a relative's degree
+  // Someone speaking to a graduating class isn't in it ("as a commencement speaker… with the class of 2012").
+  /\bcommencement (speaker|address|speech)\b/i,
+  /\b(to|with|address\w*|told|tells|welcom\w+|congratulat\w+) the class of\b/i,
 ];
 
 const UW = /\b(university of wisconsin|uw[-–—\s]*madison|wisconsin[-–—\s]*madison|wisconsin school of business|\buw\b|badger)/i;

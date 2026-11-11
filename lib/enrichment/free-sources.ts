@@ -38,8 +38,12 @@ async function loadCache() {
 
 async function saveCache() {
   const { mkdirSync, writeFileSync } = await import("node:fs");
-  mkdirSync("data/private", { recursive: true });
-  writeFileSync(CACHE_FILE, JSON.stringify(cache));
+  try {
+    mkdirSync("data/private", { recursive: true });
+    writeFileSync(CACHE_FILE, JSON.stringify(cache));
+  } catch {
+    // A read-only disk (the deployed site): the cache lives in memory only.
+  }
 }
 
 async function politeFetch(url: string, accept = "application/json"): Promise<Response | null> {

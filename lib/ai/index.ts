@@ -9,12 +9,15 @@ import { OpenAiCompatibleBackend } from "./backends/openai-compatible";
 import { isGrounded } from "./grounding";
 import { type AiConfig, type AiTaskKind, type ChatProvider, loadAiConfig } from "./config";
 import {
+  CAREER_SYSTEM,
   ENRICH_SYSTEM,
   EXPLAIN_SYSTEM,
   OUTREACH_SYSTEM,
   type OutreachInput,
   RANK_SYSTEM,
   SUMMARY_SYSTEM,
+  careerStub,
+  careerUserPrompt,
   enrichStub,
   enrichUserPrompt,
   explainStub,
@@ -32,6 +35,9 @@ import {
 import {
   type CandidateForExplanation,
   type CandidateForRanking,
+  type Career,
+  type CareerInput,
+  careerSchema,
   type Enrichment,
   type EnrichmentInput,
   enrichmentSchema,
@@ -90,6 +96,8 @@ export interface Ai {
   rankMatches(request: string, candidates: CandidateForRanking[]): Promise<RankedPerson[]>;
   draftOutreach(input: OutreachInput): Promise<OutreachDraft>;
   extractEnrichment(input: EnrichmentInput): Promise<Enrichment & { model: string }>;
+  /** Jobs the sources state, each with a quote for the caller to verify. */
+  extractCareer(input: CareerInput): Promise<Career>;
   embed(texts: string[], kind?: EmbedKind): Promise<number[][]>;
   /** Names the vector space, so profiles embedded by another model are never compared with these. */
   readonly embedModel: string;
@@ -243,6 +251,17 @@ export function createAi(config: AiConfig = loadAiConfig()): Ai {
       return { ...result, model };
     },
 
+    async extractCareer(input) {
+      const { result } = await run("extract", {
+        task: "extract-career",
+        schema: careerSchema,
+        system: CAREER_SYSTEM,
+        user: careerUserPrompt(input),
+        stub: careerStub,
+      });
+      return result;
+    },
+
     embedModel: embedder.name,
 
     async embed(texts, kind = "document") {
@@ -269,5 +288,5 @@ export function getAi(): Ai {
 }
 
 export type { CandidateForRanking } from "./schemas";
-export type { Enrichment, EnrichmentInput, EnrichmentSource, ParsedQuery, ProfileFacts, ProfileSummary } from "./schemas";
+export type { Career, CareerInput, Enrichment, EnrichmentInput, EnrichmentSource, ParsedQuery, ProfileFacts, ProfileSummary } from "./schemas";
 export { factsHash } from "./prompts";

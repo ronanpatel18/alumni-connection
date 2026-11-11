@@ -165,3 +165,30 @@ export interface EnrichmentInput {
   sources: EnrichmentSource[];
   industries: { slug: string; name: string }[];
 }
+
+// ---------------------------------------------------------------------------
+// Work history extracted from the same sources. Each job carries a verbatim
+// quote, checked against its source before it's saved (lib/enrichment/person-lookup.ts).
+// ---------------------------------------------------------------------------
+
+export const careerSchema = z.strictObject({
+  positions: z
+    .array(
+      z.strictObject({
+        title: z.string().max(150),
+        organization: z.string().max(120),
+        startYear: z.number().int().min(1940).max(2035).nullable(),
+        endYear: z.number().int().min(1940).max(2035).nullable(),
+        isCurrent: z.boolean(),
+        evidence: z.string().max(500),
+        sourceId: z.string().max(10),
+      }),
+    )
+    .max(12),
+});
+export type Career = z.infer<typeof careerSchema>;
+
+export interface CareerInput {
+  fullName: string;
+  sources: EnrichmentSource[];
+}

@@ -20,6 +20,7 @@
     "org-domains": "tsx --env-file=.env.local scripts/find-org-domains.ts",
     "contacts": "tsx --env-file=.env.local scripts/find-contacts.ts",
     "enrich": "tsx --env-file=.env.local scripts/enrich-people.ts",
+    "add-people": "tsx --env-file=.env.local scripts/add-people.ts",
     "class-years": "tsx --env-file=.env.local scripts/find-class-years.ts",
     "linkedin": "tsx --env-file=.env.local scripts/import-linkedin.ts",
     "search:start": "test -f searxng/.env || echo \"SEARXNG_SECRET=$(openssl rand -hex 32)\" > searxng/.env; docker compose -f searxng/docker-compose.yml up -d",

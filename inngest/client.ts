@@ -8,4 +8,5 @@ export const EVENTS = {
   summaryRequested: "people/summary.requested",
   summaryBackfill: "people/summaries.backfill",
   embeddingsBackfill: "people/embeddings.backfill",
+  personLookup: "people/lookup.requested",
 } as const;
