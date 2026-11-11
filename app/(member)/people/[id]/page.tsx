@@ -206,8 +206,18 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
               <Icon name="mail" /> Send a message
             </Link>
           )}
+          {confirmed && person.claimed_by_user_id !== viewer.userId && (
+            <Link className="btn" href={`/meetings/new?person=${person.id}`}>
+              <Icon name="calendar" /> Propose a meeting
+            </Link>
+          )}
           {linkedin && <LinkedInLink name={person.full_name} url={linkedin.value} withText />}
           <SaveButton personId={person.id} name={person.full_name} saved={Boolean(saved)} withText />
+          {person.claimed_by_user_id !== viewer.userId && (
+            <Link className="btn quiet" href={`/followups?person=${person.id}#log`}>
+              <Icon name="clock" /> Log a conversation
+            </Link>
+          )}
         </div>
       </section>
 

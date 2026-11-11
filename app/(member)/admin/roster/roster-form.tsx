@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { Icon } from "@/components/icon";
 import type { RosterStatus } from "@/lib/importers/roster";
-import { previewRosterFile, type RosterState } from "./actions";
+import { importRoster, previewRosterFile, type RosterState } from "./actions";
 
 const SHOWN_ROWS = 300;
 
@@ -15,6 +15,44 @@ const STATUS: Record<RosterStatus, { label: string; order: number }> = {
   repeat: { label: "Repeated in file", order: 3 },
   new: { label: "New", order: 4 },
 };
+
+function ImportForm({ result, action, pending }: { result: Extract<RosterState, { status: "preview" }>; action: (data: FormData) => void; pending: boolean }) {
+  const count = result.importable.length;
+  const gaps = Object.values(result.preview.missing).some((n) => n > 0);
+  if (!count) {
+    return (
+      <div className="notice" style={{ marginTop: 24 }}>
+        <Icon name="info" />
+        <div>Nothing to import: no row in this file is new.</div>
+      </div>
+    );
+  }
+  return (
+    <form action={action} className="panel pad" style={{ marginTop: 24 }}>
+      <h2>
+        Import {count} new {count === 1 ? "person" : "people"}
+      </h2>
+      <p className="small muted" style={{ margin: "12px 0 16px" }}>
+        Only rows marked New are added. Duplicates, repeats, rows without a name and anyone who asked to be removed are left out. Each new
+        profile is marked as a confirmed alum from this roster; roster emails stay private and are used only to match a claim.
+      </p>
+      <input type="hidden" name="rows" value={JSON.stringify(result.importable)} />
+      <input type="hidden" name="source" value={result.source} />
+      <input type="hidden" name="authorized" value="on" />
+      {gaps && (
+        <label className="checkbox">
+          <input type="checkbox" name="lookup" defaultChecked />
+          Look up missing class years, roles and locations on the web (first 25 people with gaps)
+        </label>
+      )}
+      <div className="form-actions">
+        <button type="submit" className="btn primary" disabled={pending}>
+          {pending ? "Importing…" : `Import ${count} ${count === 1 ? "person" : "people"}`}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function Preview({ result }: { result: Extract<RosterState, { status: "preview" }> }) {
   const { preview, fileName, ignoredColumns } = result;
@@ -31,7 +69,7 @@ function Preview({ result }: { result: Extract<RosterState, { status: "preview" 
           <span className="badge-count">{total} rows</span>
         </div>
         <p className="meta" style={{ marginTop: 8 }}>
-          Preview only. Nothing was imported, and this file wasn’t saved.
+          Preview only. Nothing has been imported yet, and this file wasn’t saved.
         </p>
         <div className="od-cluster" style={{ marginTop: 16 }}>
           {statuses
@@ -111,7 +149,38 @@ function Preview({ result }: { result: Extract<RosterState, { status: "preview" 
 }
 
 export function RosterForm() {
-  const [state, action, pending] = useActionState<RosterState, FormData>(previewRosterFile, { status: "idle" });
+  const [previewState, action, pending] = useActionState<RosterState, FormData>(previewRosterFile, { status: "idle" });
+  const [importState, importAction, importing] = useActionState<RosterState, FormData>(importRoster, { status: "idle" });
+  // The newest result wins: an import replaces the preview it came from.
+  const state = importState.status === "idle" || pending ? previewState : importState;
+  if (state.status === "imported") {
+    return (
+      <div className="panel pad">
+        <div className="notice success" role="status">
+          <Icon name="check" />
+          <div>
+            <p>
+              Imported {state.imported} {state.imported === 1 ? "person" : "people"}.
+              {state.skipped > 0 && ` ${state.skipped} ${state.skipped === 1 ? "row was" : "rows were"} no longer new and left out.`}
+            </p>
+            {state.lookedUp > 0 && (
+              <p>
+                Looking up missing details for {state.lookedUp}. Follow them under <Link href="/admin/people">Add people</Link>.
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="form-actions">
+          <Link className="btn primary" href="/admin/review">
+            Review new profiles
+          </Link>
+          <a className="btn" href="/admin/roster">
+            Import another roster
+          </a>
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <form action={action} className="panel pad">
@@ -146,7 +215,12 @@ export function RosterForm() {
           </button>
         </div>
       </form>
-      {state.status === "preview" && <Preview result={state} />}
+      {state.status === "preview" && (
+        <>
+          <ImportForm result={state} action={importAction} pending={importing} />
+          <Preview result={state} />
+        </>
+      )}
     </>
   );
 }

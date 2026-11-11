@@ -6,7 +6,7 @@ import { PageTitle } from "@/components/person";
 import { ProfileTabs } from "@/components/profile-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
-import { removeImportedConnections } from "./actions";
+import { removeImportedConnections, setShareConnections } from "./actions";
 import { ImportForm } from "./import-form";
 
 export const metadata: Metadata = { title: "LinkedIn import" };
@@ -19,6 +19,8 @@ async function LinkedInImport() {
     .select("person_id, created_at, people(full_name)")
     .eq("owner_user_id", viewer.userId)
     .returns<{ person_id: string; created_at: string; people: { full_name: string } | null }[]>();
+  const { data: membership } = await supabase.from("members").select("share_connections").eq("user_id", viewer.userId).maybeSingle<{ share_connections: boolean }>();
+  const sharing = Boolean(membership?.share_connections);
   const known = (data ?? []).filter((r) => r.people).sort((a, b) => a.people!.full_name.localeCompare(b.people!.full_name));
 
   return (
@@ -42,6 +44,24 @@ async function LinkedInImport() {
                   </Link>
                 ))}
               </div>
+              {viewer.personId && (
+                <form action={setShareConnections} className="notice" style={{ marginTop: 24 }}>
+                  <div>
+                    <p>
+                      <strong>{sharing ? "Members can ask you for introductions to these people." : "Help other members reach these people?"}</strong>
+                    </p>
+                    <p>
+                      {sharing
+                        ? "Your name appears as a possible connector on these profiles. Each request still needs your yes, and the list itself stays private."
+                        : "If you turn this on, your name appears as a possible connector on these profiles. Nothing is sent without your yes, and nobody sees the list itself."}
+                    </p>
+                    <input type="hidden" name="share" value={sharing ? "false" : "true"} />
+                    <button type="submit" className="btn" style={{ marginTop: 12 }}>
+                      {sharing ? "Stop offering introductions" : "Offer introductions"}
+                    </button>
+                  </div>
+                </form>
+              )}
               <div className="form-actions">
                 <DialogButton label="Remove imported connections" title="Remove imported connections?" className="btn quiet">
                   <p className="small muted">This deletes the list of people you know from LinkedIn. Your profile isn’t changed.</p>

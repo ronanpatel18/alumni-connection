@@ -195,6 +195,13 @@ export function OutreachForm(props: Props) {
       <p className="small muted" style={{ margin: "8px 0 16px" }}>
         Agree on a time together first, then add it to both calendars.
       </p>
+      {props.canMessage && (
+        <p style={{ marginBottom: 12 }}>
+          <a className="btn primary" href={`/meetings/new?person=${props.personId}&trip=${props.tripId}`}>
+            <Icon name="calendar" /> Propose a time
+          </a>
+        </p>
+      )}
       <DialogButton label="Prepare a calendar invitation" title={`Meeting with ${props.recipientName}`} className="btn">
         <p className="small muted">This downloads a tentative .ics file. It doesn’t book a time or send an invitation.</p>
         <form

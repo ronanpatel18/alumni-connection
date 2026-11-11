@@ -7,6 +7,8 @@ const TABS = [
   { href: "/saved", label: "Saved contacts" },
   { href: "/messages", label: "Messages" },
   { href: "/introductions", label: "Introductions" },
+  { href: "/meetings", label: "Meetings" },
+  { href: "/followups", label: "Follow-ups" },
 ];
 
 export function RelationshipTabs() {

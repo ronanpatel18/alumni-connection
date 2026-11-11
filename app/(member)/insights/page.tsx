@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { CommunityTabs } from "@/components/community-tabs";
 import { AutoSubmit } from "@/components/auto-submit";
 import { Icon } from "@/components/icon";
 import { EmptyState, PageTitle } from "@/components/person";
@@ -238,10 +239,11 @@ export default function InsightsPage({ searchParams }: PageProps<"/insights">) {
   return (
     <>
       <PageTitle
-        eyebrow="Network insights"
+        eyebrow="Community / Insights"
         title="See where the network comes together."
         description="Explore concentrations by market and industry, with confirmed and unconfirmed records always counted separately."
       />
+      <CommunityTabs />
       <Suspense fallback={<div className="filter-row" style={{ margin: "0 0 24px", height: 70 }} />}>
         <Filters searchParams={searchParams} />
       </Suspense>

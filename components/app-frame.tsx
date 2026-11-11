@@ -11,9 +11,10 @@ const NAV: { href: string; label: string; icon: IconName; matches: string[] }[] 
   { href: "/discover", label: "Discover", icon: "search", matches: ["/discover"] },
   // Search, and the profiles opened from it.
   { href: "/search", label: "People", icon: "person", matches: ["/search", "/people"] },
-  { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved", "/messages", "/introductions"] },
+  { href: "/saved", label: "Relationships", icon: "people", matches: ["/saved", "/messages", "/introductions", "/meetings", "/followups"] },
   { href: "/trips", label: "Trips", icon: "trip", matches: ["/trips"] },
-  { href: "/insights", label: "Insights", icon: "chart", matches: ["/insights"] },
+  // Events, jobs, mentorship, alumni businesses and the network's numbers.
+  { href: "/events", label: "Community", icon: "calendar", matches: ["/events", "/jobs", "/mentorship", "/businesses", "/insights"] },
 ];
 const UTILITY_NAV = { href: "/me", label: "Profile & privacy", icon: "settings" as const, matches: ["/me"] };
 // Shown only to administrators (the layout passes <AdminNavItem /> for them).
