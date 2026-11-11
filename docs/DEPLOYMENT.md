@@ -53,7 +53,8 @@ you control, verified under **Domains**; `EMAIL_FROM` must use that domain.
 | `AI_MODE` | `live` |
 | `AI_EXTRACT_PROVIDER` / `AI_WRITE_PROVIDER` | `gemini` |
 | `AI_EXTRACT_MODEL` / `AI_WRITE_MODEL` | `gemini-3.1-flash-lite` |
-| `AI_EMBED_PROVIDER` | `fixture` |
+| `AI_EMBED_PROVIDER` | `gemini` |
+| `AI_EMBED_MODEL` | `gemini-embedding-2` (free tier; profiles must then be embedded once, see README "Prompt search") |
 | `GEMINI_API_KEY` | your Google AI Studio key |
 | `RESEND_API_KEY` | Resend API key (message and introduction emails) |
 | `EMAIL_FROM` | e.g. `Alumni Connect <notifications@your-domain>` |
@@ -63,13 +64,33 @@ https://upstash.com). Without them, rate limits are counted per server instance,
 on Vercel means they're weak.
 
 Never set `DEV_AUTO_LOGIN_EMAIL` or `INNGEST_DEV` in production (the auto sign-in is
-ignored outside `next dev` anyway). Add `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` and
-sync `/api/inngest` in Inngest Cloud before inviting anyone: a job runs every five minutes
-to retry failed notification emails, and without it a failed email waits until someone's
-next message or introduction. It also writes AI summaries for new profiles. Failed and
-waiting emails show under **Administration → Pilot progress**.
+ignored outside `next dev` anyway).
 
-3. Deploy. After that, every push to `main` deploys automatically.
+### Background jobs (Inngest), before inviting anyone
+
+Three jobs run on a schedule or on demand, and none of them run until Inngest is connected:
+
+- every 5 minutes: retry failed notification emails (without it a failed email waits
+  until someone's next message or introduction);
+- every hour: write the AI summary and the search embedding for new profiles, so
+  people added by an import or a claim show up in prompt search without running a script;
+- on demand: `people/summaries.backfill` and `people/embeddings.backfill`.
+
+To connect it (free plan):
+
+1. Create an account at https://www.inngest.com.
+2. Easiest: in Vercel, **Integrations → Browse Marketplace → Inngest → Add**, and pick
+   this project. It adds `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` and syncs the app
+   on every deploy. (By hand instead: copy both keys from Inngest → **Manage → Event Keys /
+   Signing Key** into Vercel's Production environment variables.)
+3. Redeploy, then in Inngest → **Apps** check `alumni-connect` is listed with its five
+   functions. If it isn't, **Sync new app** with `https://<your-domain>/api/inngest`.
+4. If Vercel **Deployment Protection** is on for production, allow `/api/inngest` (the
+   integration offers a bypass), or Inngest's calls are blocked.
+
+Failed and waiting emails show under **Administration → Pilot progress**.
+
+3. Deploy. After that, every push to `main` deploys automatically. A deploy does **not** update the database: when a push adds a file under `supabase/migrations/`, apply it (`npm run deploy:db`, step 1) or pages that need it will fail.
 
 ## 5. Make yourself an administrator
 

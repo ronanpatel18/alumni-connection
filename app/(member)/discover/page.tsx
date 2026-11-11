@@ -12,7 +12,12 @@ import { requireMember } from "@/lib/viewer";
 
 export const metadata: Metadata = { title: "Discover" };
 
-const SEARCH_HINTS = ["Real estate in Chicago", "Finance in New York", "Technology in Seattle"];
+// Described goals, not keywords: the Discover box is the AI search (/search/ask).
+const SEARCH_HINTS = [
+  "People in commercial real estate in Chicago who mentor",
+  "Executives in finance I could ask about starting a fund",
+  "Technology leaders who graduated in the 2000s",
+];
 const DEFAULT_GOAL = "partners" as const;
 
 /** A few starting points ranked for the member's goal, each with its reason. */
@@ -82,22 +87,35 @@ export default function DiscoverPage() {
           </Suspense>
           <section aria-labelledby="search-label">
             <label className="search-label" id="search-label" htmlFor="discovery-search">
-              Who would you like to connect with?
+              Who would you like to meet, and why?
             </label>
-            <form className="search-box" action="/search" role="search">
+            <form className="search-box" action="/search/ask" role="search">
               <Icon name="search" />
-              <input id="discovery-search" name="q" placeholder="Try “commercial real estate in Chicago”" autoComplete="off" />
+              <input
+                id="discovery-search"
+                name="ask"
+                maxLength={500}
+                required
+                placeholder="Describe them: “I’m moving to Chicago and want to meet people in real estate”"
+                autoComplete="off"
+                aria-describedby="discovery-search-help"
+              />
               <button type="submit" className="btn primary">
-                Find alumni <Icon name="arrow" />
+                Find people <Icon name="arrow" />
               </button>
             </form>
+            <p id="discovery-search-help" className="search-hints" style={{ marginTop: 12 }}>
+              <span className="chip ai">AI-assisted</span>
+              <span>Say it in your own words. You’ll get people, the facts behind each suggestion, and filters you can correct.</span>
+            </p>
             <div className="search-hints">
-              <span>Try a search:</span>
+              <span>Try:</span>
               {SEARCH_HINTS.map((q) => (
-                <Link key={q} href={`/search?q=${encodeURIComponent(q)}`} style={{ color: "var(--muted)" }}>
+                <Link key={q} href={`/search/ask?${new URLSearchParams({ ask: q })}`} prefetch={false} style={{ color: "var(--muted)" }}>
                   {q}
                 </Link>
               ))}
+              <Link href="/search">Or search by name and filters</Link>
             </div>
           </section>
 
