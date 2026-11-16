@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { EVENTS, inngest } from "@/inngest/client";
 import { getAi } from "@/lib/ai";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LOOKUP_PROVIDER, runPersonLookup } from "./save-person";
+import { LOOKUP_PROVIDER, runLookupBatch } from "./save-person";
 
 export interface Lookup {
   personId: string;
@@ -35,14 +35,6 @@ export async function startLookups(lookups: Lookup[], hint: string | null) {
       new Promise((_, reject) => setTimeout(() => reject(new Error("queue timeout")), 4000)),
     ]);
   } catch {
-    after(async () => {
-      const db = createAdminClient();
-      const queue = [...lookups];
-      await Promise.all(
-        Array.from({ length: 2 }, async () => {
-          for (let next = queue.shift(); next; next = queue.shift()) await runPersonLookup(db, getAi(), { ...next, hint });
-        }),
-      );
-    });
+    after(() => runLookupBatch(createAdminClient(), getAi(), lookups, { hint }));
   }
 }

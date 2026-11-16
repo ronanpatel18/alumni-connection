@@ -379,31 +379,31 @@ Data and backend work (Phase 0–1 schema, enrichment, auth) doesn't wait on des
   - Seed with fake data.
   - CI and Vercel deploy.
   - Write `docs/ARCHITECTURE.md`.
-- **Phase 1 (foundation):**
-  - Roster CSV import.
-  - Enrichment pipeline v1.
+- **Phase 1 (foundation):** all **built**. Current status of every item is tracked in [PROGRESS.md](PROGRESS.md).
+  - Roster CSV import. **Built** (`/admin/roster`, `lib/importers/roster-import.ts`): preview, then import the rows still new.
+  - Enrichment pipeline v1. **Built** (§3b-2).
   - Claim/verify flow.
   - Directory with filters (geography, industry, keywords).
   - Profile editing and privacy controls.
   - Contact details.
   - Saved contacts and notes.
   - Admin review queue.
-- **Phase 2 (intelligence):**
+- **Phase 2 (intelligence):** all **built**.
   - Natural-language search. **Built** (`/search/ask`, `lib/search/ask*.ts`, `search_people_hybrid`, migration `…hybrid_search`): Gemini reads a described goal into editable filters; hybrid retrieval over filters, full-text and pgvector; an AI re-rank with one reason per person, fact-checked in code (`lib/ai/grounding.ts`). The rule parser is the free path and the fallback.
   - Relevance ranking with "why". **Built** (`lib/recommendations.ts`, `/discover/who-to-meet`): rule-based order per goal, AI writes the reason only.
   - LinkedIn CSV import and mutual connections. **Built** (`/me/linkedin`, migration `…1500_linkedin_import`): the export is parsed in the browser; matches go to a private `my_connections` table rather than `edges`, so members without a claimed profile can use it.
-  - Intro engine. **Built** (double opt-in with consent events; migration `…1300_introductions`); 2-hop paths will use `edges` as members import connections.
-  - Trip/meeting planner with outreach drafts. **Built** (`app/(member)/trips`, `lib/trips.ts`, migration `…1200_trips`); the email relay and booked meetings are still to come.
-  - Follow-up reminders.
+  - Intro engine. **Built** (double opt-in with consent events; migration `…1300_introductions`). Connector paths (migration `…intro_paths`): a shared group, a recorded connection, a shared employer, or an imported LinkedIn connection whose owner turned on "offer introductions" (`members.share_connections`, off by default).
+  - Trip/meeting planner with outreach drafts. **Built** (`app/(member)/trips`, `lib/trips.ts`, migration `…1200_trips`). Meetings **built** (`/meetings`, migration `…meetings`): propose, accept or decline, cancel; only an accepted meeting is booked.
+  - Follow-up reminders. **Built** (`/followups`, migration `…follow_ups`): a private log on `interactions`; `queue_follow_up_reminders()` turns due dates into notifications, run hourly by Inngest and daily by `/api/cron/daily` (`vercel.json`).
   - Private messaging **built** instead of an email-alias relay (migration `…1600_messages`): messages stay in the app, email notifications carry no content or addresses, members only.
-- **Phase 3 (network intelligence):**
+- **Phase 3 (network intelligence):** all **built** except two-way calendar sync.
   - Industry and market analytics (verified vs estimated). **Built** (`/insights`, `network_insights()`, migration `…1400_network_insights`).
-  - Business directory.
-  - Mentorship matching.
-  - Events by city.
-  - Jobs and referrals.
-  - Engagement dashboard.
-  - Calendar sync.
+  - Business directory. **Built** (`/businesses`, migration `…businesses`): member listings, plus founders and owners already in the directory.
+  - Mentorship matching. **Built** (`/mentorship`, migration `…mentorship`): accepting records a `mentor` edge, which is what `is_connected_to` reads.
+  - Events by city. **Built** (`/events`, migration `…events`): any member posts, RSVPs are visible to members.
+  - Jobs and referrals. **Built** (`/jobs`, migration `…jobs`): a referral request is a private message to the poster.
+  - Engagement dashboard. **Built** (`/admin/engagement`, `admin_engagement_metrics()`): counts only.
+  - Calendar sync. **Partly built**: a private subscription address per member (`calendar_feeds`, `app/calendar/[token]`) with booked meetings, events and follow-up dates, and calendar files (`lib/calendar.ts`). Reading a member's own calendar (free/busy) needs a Google or Microsoft app and isn't built.
 
 ## 11. Cost
 

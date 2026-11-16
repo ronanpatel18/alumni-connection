@@ -13,6 +13,7 @@
 //    the model; every model fact needs a quote found in its source.
 // Nothing here writes to the database: see save-person.ts.
 import type { Ai, EnrichmentSource } from "@/lib/ai";
+import { formatCity, formatEducation, formatJobTitle, formatOrganization, formatSpecialties } from "./format";
 import { chooseClassYears, type ClassYearFinding, findClassYears } from "./class-year";
 import { degreeFromDetails, isUwMadison, parseLinkedInSnippet, US_STATES } from "./linkedin";
 import { type SearchResult, webSearch } from "./providers";
@@ -138,13 +139,34 @@ const CURRENT_WITHIN_MS = 2 * 365 * 86_400_000;
 const isRecent = (published: string | null | undefined) => Boolean(published) && Date.now() - Date.parse(published!) < CURRENT_WITHIN_MS;
 const dated = (r: SearchResult, text: string) => (r.published ? `Published: ${r.published}\n${text}` : text);
 
-/** Free model tiers refuse a burst now and then: one more try after a pause. */
-async function twice<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch {
-    await new Promise((resolve) => setTimeout(resolve, 4000));
+// Free model tiers allow only so many calls a minute. Calls from every lookup
+// in this process take turns with a pause between them, and one refused for
+// being too fast waits and tries again, twice, before the lookup gives up.
+const MODEL_GAP_MS = Number(process.env.ENRICH_MODEL_GAP_MS ?? 4500);
+const MODEL_RETRY_WAITS_MS = [20_000, 45_000];
+let modelTurn: Promise<unknown> = Promise.resolve();
+let lastModelCallAt = 0;
+
+function paced<T>(run: () => Promise<T>): Promise<T> {
+  const next = modelTurn.then(async () => {
+    const wait = lastModelCallAt + MODEL_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastModelCallAt = Date.now();
     return run();
+  });
+  modelTurn = next.catch(() => undefined);
+  return next;
+}
+
+async function twice<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await paced(run);
+    } catch (error) {
+      const busy = /\b(429|503|rate|quota|overloaded|high demand)\b/i.test(String((error as Error)?.message));
+      if (!busy || attempt >= MODEL_RETRY_WAITS_MS.length) throw error;
+      await new Promise((resolve) => setTimeout(resolve, MODEL_RETRY_WAITS_MS[attempt]));
+    }
   }
 }
 
@@ -155,6 +177,10 @@ export function selectSources(input: LookupInput, results: SearchResult[]): { ke
     .toLowerCase()
     .split(/[^a-z0-9&']+/)
     .filter((w) => w.length >= 3 && !HINT_STOP.has(w) && w !== first && w !== last);
+  const employerWords = (input.organizationName ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9&']+/)
+    .filter((w) => w.length >= 3 && !HINT_STOP.has(w) && !["foods", "services", "systems", "solutions", "holdings", "international", "global", "capital", "management", "retail"].includes(w));
   const knownProfile = input.linkedinUrl ? bare(input.linkedinUrl) : null;
   const notes: string[] = [];
   const kept: Kept[] = [];
@@ -168,6 +194,10 @@ export function selectSources(input: LookupInput, results: SearchResult[]): { ke
     const all = `${title}\n${body}`.toLowerCase();
     if (!first || !all.includes(first) || !all.includes(last)) continue;
     const hintHits = hintWords.filter((w) => all.includes(w)).length;
+    // When we know where they work, a page has to say so (or tie them to the
+    // business school's boards): UW–Madison alone also fits every namesake who
+    // studied or works there.
+    const fitsEmployer = !employerWords.length || employerWords.some((w) => all.includes(w)) || /wisconsin school of business|advisory board|alumni board/.test(all);
     const score = (UW_WORDS.test(all) ? 2 : 0) + hintHits * 2 + (body.length > 400 ? 1 : 0);
 
     if (/linkedin\.com/i.test(r.url)) {
@@ -177,12 +207,14 @@ export function selectSources(input: LookupInput, results: SearchResult[]): { ke
       // LinkedIn titles are "Name - Headline": theirs must carry their first and last name.
       if (!isKnown && (!title.includes(first) || !title.includes(last))) continue;
       if (!isKnown && !UW_WORDS.test(all) && !hintHits) continue;
+      if (!isKnown && employerWords.length && !employerWords.some((w) => all.includes(w))) continue;
       seen.add(bare(r.url));
       profiles.push({ result: r as Kept["result"], kind: "linkedin", text: `${r.title ?? ""}\n${r.raw_content ?? r.content ?? ""}`.slice(0, 8000), score: score + (isKnown ? 100 : 0) });
       continue;
     }
     const uwSite = onUwSite(r.url);
     if (!uwSite && !UW_WORDS.test(all) && !hintHits) continue;
+    if (!fitsEmployer) continue;
     seen.add(bare(r.url));
     const page = r.raw_content ? aroundName(r.raw_content, last, 5000) : "";
     kept.push({ result: r as Kept["result"], kind: uwSite ? "uw" : "web", text: dated(r, `${r.title ?? ""}\n${r.content ?? ""}\n${page}`.trim()), score: score + (uwSite ? 2 : 0) });
@@ -200,10 +232,14 @@ export function selectSources(input: LookupInput, results: SearchResult[]): { ke
 
 const yearDate = (year: number | null) => (year ? `${year}-01-01` : null);
 
-function addPosition(positions: FoundPosition[], next: FoundPosition) {
-  if (!next.title.trim() || !next.organization.trim()) return;
-  if (/\b(candidate|student|intern(ship)?)\b/i.test(next.title)) return;
-  const same = positions.find((p) => sameOrg(p.organization, next.organization) && p.title.toLowerCase() === next.title.toLowerCase());
+function addPosition(positions: FoundPosition[], raw: FoundPosition) {
+  // Written the directory's way ("Lead Director"); a "title" that is really a sentence is dropped.
+  const title = formatJobTitle(raw.title);
+  const organization = formatOrganization(raw.organization);
+  if (!title || !organization) return;
+  if (/\b(candidate|student|intern(ship)?)\b/i.test(title)) return;
+  const next = { ...raw, title, organization };
+  const same = positions.find((p) => sameOrg(p.organization, organization) && p.title.toLowerCase() === title.toLowerCase());
   if (!same) positions.push(next);
   else {
     same.startDate ??= next.startDate;
@@ -212,18 +248,28 @@ function addPosition(positions: FoundPosition[], next: FoundPosition) {
   }
 }
 
-function addEducation(educations: FoundEducation[], next: FoundEducation) {
-  const degree = normalizeDegree(next.degree);
+function addEducation(educations: FoundEducation[], raw: FoundEducation) {
+  // "bachelor of science in computer science" → BS, Computer Science.
+  const { degree, major } = formatEducation(normalizeDegree(raw.degree), raw.major);
+  const next = { ...raw, degree, major };
   // Sources label one degree differently ("BA ’55", "bachelor's of business
   // administration"): the same year is the same degree, and the first label stays.
   const same =
     educations.find((e) => e.gradYear !== null && e.gradYear === next.gradYear) ??
     educations.find((e) => (e.degree === degree || !e.degree || !degree) && (!e.gradYear || !next.gradYear));
-  if (!same) educations.push({ ...next, degree });
+  if (!same) educations.push(next);
   else {
     same.degree ??= degree;
-    same.major ??= next.major;
+    same.major ??= major;
     if (!same.gradYear && next.gradYear) Object.assign(same, { gradYear: next.gradYear, sourceUrl: next.sourceUrl, quote: next.quote });
+  }
+}
+
+/** The model couldn't be reached (out of quota, overloaded). Nothing was saved; the lookup can be run again later. */
+export class ModelUnavailableError extends Error {
+  constructor(detail: string) {
+    super(`The AI model isn't available right now, so nothing was saved. Try again later. (${detail.slice(0, 160)})`);
+    this.name = "ModelUnavailableError";
   }
 }
 
@@ -236,7 +282,7 @@ export interface LookupDeps {
 
 export async function lookupPerson(input: LookupInput, { ai, industries, search = webSearch }: LookupDeps): Promise<PersonFindings> {
   const name = input.fullName.trim();
-  const { last } = nameWords(name);
+  const { first, last } = nameWords(name);
   const context = [input.hint, input.title, input.organizationName].filter(Boolean).join(" ").trim();
   const worthReading = (r: { title?: string; content?: string }) => {
     const text = `${r.title ?? ""} ${r.content ?? ""}`.toLowerCase();
@@ -274,9 +320,11 @@ export async function lookupPerson(input: LookupInput, { ai, industries, search 
   const sources: EnrichmentSource[] = selected.kept.map((k, i) => ({ id: `S${i + 1}`, url: k.result.url, text: k.text }));
 
   // --- The model: degrees, alumni status, location, industry; and jobs. ---
+  // Fixture mode calls no model, so there's nothing to pace.
+  const call = <T>(run: () => Promise<T>) => (ai.config.mode === "fixture" ? run() : twice(run));
   const [enrichment, career] = await Promise.allSettled([
-    twice(() => ai.extractEnrichment({ fullName: name, title: input.title ?? null, organizationName: input.organizationName ?? null, sources, industries })),
-    twice(() => ai.extractCareer({ fullName: name, sources })),
+    call(() => ai.extractEnrichment({ fullName: name, title: input.title ?? null, organizationName: input.organizationName ?? null, sources, industries })),
+    call(() => ai.extractCareer({ fullName: name, sources })),
   ]);
   if (enrichment.status === "fulfilled") {
     const verified = verifyEnrichment(enrichment.value, sources, new Set(industries.map((i) => i.slug)));
@@ -291,7 +339,9 @@ export async function lookupPerson(input: LookupInput, { ai, industries, search 
     findings.specialties = verified.specialties;
     if (verified.rejected.length) findings.notes.push(`Dropped (no matching quote in the source): ${verified.rejected.join("; ")}`);
   } else {
-    findings.notes.push(`The model couldn't read the sources (${String((enrichment.reason as Error).message).slice(0, 120)}); only pattern matches were used.`);
+    // Without the model there's nobody to tell this person's pages from a namesake's,
+    // and pattern matches alone have saved wrong facts. Better to stop and try later.
+    throw new ModelUnavailableError(String((enrichment.reason as Error)?.message ?? enrichment.reason));
   }
   if (career.status === "fulfilled") {
     for (const p of career.value.positions) {
@@ -308,10 +358,23 @@ export async function lookupPerson(input: LookupInput, { ai, industries, search 
   // --- Plain patterns: they work without a model and double-check it. ---
   const classYears: (ClassYearFinding & { sourceUrl: string })[] = [];
   for (const k of selected.kept) {
-    const pageIsAboutThem = k.kind === "linkedin" || (k.result.title ?? "").toLowerCase().includes(last);
+    const pageTitle = (k.result.title ?? "").toLowerCase();
+    const pageIsAboutThem = k.kind === "linkedin" || (pageTitle.includes(first) && pageTitle.includes(last));
     for (const f of findClassYears(k.text, { uwContext: k.kind === "uw", about: { fullName: name, pageIsAboutThem } })) classYears.push({ ...f, sourceUrl: k.result.url });
   }
-  for (const f of chooseClassYears(classYears)) {
+  // Where pages disagree on a degree's year, UW–Madison's own pages decide if they agree with each other.
+  const kinds = new Map(selected.kept.map((k) => [k.result.url, k.kind]));
+  const settled = classYears.filter((f) => {
+    const rivals = classYears.filter((o) => o.degree === f.degree);
+    if (new Set(rivals.map((o) => o.year)).size < 2) return true;
+    const official = rivals.filter((o) => kinds.get(o.sourceUrl) === "uw");
+    if (new Set(official.map((o) => o.year)).size === 1) return official.includes(f);
+    const years = [...new Set(rivals.map((o) => o.year))].sort().join(", ");
+    const note = `Sources disagree on the ${f.degree ?? "degree"} class year (${years}), so none was saved.`;
+    if (!findings.notes.includes(note)) findings.notes.push(note);
+    return false;
+  });
+  for (const f of chooseClassYears(settled)) {
     const sourceUrl = classYears.find((c) => c.year === f.year && c.degree === f.degree)!.sourceUrl;
     addEducation(findings.educations, { degree: f.degree, major: null, gradYear: f.year, sourceUrl, quote: f.quote });
   }
@@ -323,10 +386,35 @@ export async function lookupPerson(input: LookupInput, { ai, industries, search 
       const { degree, major } = degreeFromDetails(e.details);
       addEducation(findings.educations, { degree, major, gradYear: null, sourceUrl: url, quote: [e.school, e.details].filter(Boolean).join(", ") });
     }
-    if (!findings.location && parsed.location) findings.location = { city: parsed.location.city, state: parsed.location.state, sourceUrl: url };
+    if (!findings.location && parsed.location && formatCity(parsed.location.city)) findings.location = { city: parsed.location.city, state: parsed.location.state, sourceUrl: url };
   }
-  if (findings.location && findings.location.state && findings.location.state.length > 2) {
-    findings.location.state = US_STATES[findings.location.state.toLowerCase()] ?? null;
+  const city = findings.location ? formatCity(findings.location.city) : null;
+  if (findings.location && !city) findings.location = null;
+  if (findings.location && city) {
+    const { state } = findings.location;
+    findings.location.city = city;
+    findings.location.state = state ? (state.length > 2 ? (US_STATES[state.toLowerCase()] ?? null) : state.toUpperCase()) : null;
+  }
+  findings.specialties = formatSpecialties(findings.specialties);
+  // Two different years for one degree: UW–Madison's own page wins; otherwise
+  // we can't tell which is right, and no year is better than a wrong one.
+  const kindOf = new Map(selected.kept.map((k) => [k.result.url, k.kind]));
+  for (const degree of new Set(findings.educations.map((e) => e.degree))) {
+    const dated = findings.educations.filter((e) => e.degree === degree && e.gradYear);
+    if (new Set(dated.map((e) => e.gradYear)).size < 2) continue;
+    const official = dated.filter((e) => kindOf.get(e.sourceUrl) === "uw");
+    const keep = new Set(official.map((e) => e.gradYear)).size === 1 ? official[0] : null;
+    if (!keep) {
+      findings.notes.push(`Sources disagree on the ${degree ?? "degree"} class year (${dated.map((e) => e.gradYear).join(", ")}), so none was saved.`);
+      dated[0].gradYear = null;
+    }
+    findings.educations = findings.educations.filter((e) => !dated.includes(e) || e === (keep ?? dated[0]));
+  }
+  // Someone with a job today didn't graduate 65 years ago: that year belongs to a namesake.
+  if (input.title) {
+    const tooOld = findings.educations.filter((e) => e.gradYear && e.gradYear < new Date().getFullYear() - 65);
+    if (tooOld.length) findings.notes.push(`Left out a class year that doesn't fit someone working now (${tooOld.map((e) => e.gradYear).join(", ")}).`);
+    findings.educations = findings.educations.filter((e) => !tooOld.includes(e));
   }
   // A stated UW–Madison degree or class year is a source saying they're an alum.
   if (findings.educations.length && findings.alumniStatus !== "source_stated") {

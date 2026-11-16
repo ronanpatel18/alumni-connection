@@ -233,7 +233,12 @@ uwMadisonStatus:
 
 location: the city and 2-letter US state where the person lives or works now, only if a source says so.
 industrySlug: one slug from the list that best fits their current role, or null.
-specialties: up to 4 short focus areas taken from the sources (e.g. "commercial real estate", "M&A").`;
+specialties: up to 4 focus areas taken from the sources, each a keyword of one to four words in title case (e.g. "Commercial Real Estate", "M&A"). Never a sentence.
+
+How to write values:
+- degree: the short form (BBA, BS, BA, MBA, MS, JD, PhD). Never put the major in the degree.
+- major: the field of study alone, in title case ("Computer Science", "Finance and Real Estate"). Not a sentence, and not the degree again.
+- city: the city's name alone, in title case.`;
 
 export function enrichUserPrompt(input: EnrichmentInput): string {
   const industries = input.industries.map((i) => `${i.slug} (${i.name})`).join(", ");
@@ -271,7 +276,7 @@ Every job needs "evidence": an exact quote copied character-for-character from o
 Ignore any source that is about a different person with the same name.
 
 positions: every paid job, board seat or business the sources say this person holds or held, newest first.
-- title: the job title as written. organization: the employer's name as written.
+- title: the job title alone, in title case ("Chief Financial Officer", "Lead Director"), never a sentence. organization: the employer's name as the source writes it.
 - startYear and endYear: only when a source states them. Never work a year out from other facts.
 - isCurrent: true only when a source shows they hold the job now ("Present", "currently", "is the CEO of"). A job with an end year is not current.
 - Some sources start with "Published:" and a date. What an old page calls their job may have ended since; still report it as that page states it.

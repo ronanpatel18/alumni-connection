@@ -161,6 +161,9 @@ export function findClassYears(
         } else if (degreeFirst) {
           // "Name (BBA '94)": whose name comes right before the degree?
           if (name) {
+            // This notation always sits beside its owner's name. On their own page the
+            // sidebar still lists other alumni ("Barrick ’54, MD’57"): no name, not theirs.
+            if (!nameRe!.test(segment)) continue;
             const before = segment.slice(Math.max(0, at - 40), at).replace(/[\s,(]+$/, "");
             const prevWords = before.match(/([A-Z][\w’'.-]*)\s+([A-Z][\w’'-]+)$/);
             const prev = before.match(/([A-Z][\w’'-]+)$/)?.[1];

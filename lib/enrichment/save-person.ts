@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Ai } from "@/lib/ai";
 import { nameKey } from "@/lib/importers/roster";
 import { seniorityFor } from "@/lib/importers/wsb-boards";
-import { lookupPerson, type PersonFindings, sameOrg, SIDE_ROLE } from "./person-lookup";
+import { lookupPerson, ModelUnavailableError, type PersonFindings, sameOrg, SIDE_ROLE } from "./person-lookup";
 
 /** enrichment_jobs.provider for these lookups, so the admin page can list them. */
 export const LOOKUP_PROVIDER = "web-lookup";
@@ -181,7 +181,8 @@ export async function savePersonFindings(db: SupabaseClient, personId: string, f
     : findings.positions.filter(
         (f) => f.organization.toLowerCase() !== person.full_name.toLowerCase() && !person.positions.some((p) => p.title.toLowerCase() === f.title.toLowerCase() && sameOrg(p.organization_name, f.organization)),
       );
-  const main = findings.positions.find((p) => p.isCurrent && !SIDE_ROLE.test(p.title)) ?? findings.positions.find((p) => p.isCurrent);
+  // A board seat or advisory role isn't someone's job: with only those, the current role stays empty.
+  const main = findings.positions.find((p) => p.isCurrent && !SIDE_ROLE.test(p.title));
   const setRole = Boolean(main) && !person.current_title && !person.current_organization_id && !locked.has("current_title") && !locked.has("current_organization_id");
   let mainOrganizationId: string | null = null;
   if (main && setRole) mainOrganizationId = await findOrCreateOrganization(db, main.organization);
@@ -253,6 +254,8 @@ export async function savePersonFindings(db: SupabaseClient, personId: string, f
 
 export interface LookupOutcome {
   status: "succeeded" | "needs_review" | "failed";
+  /** True when it failed because the model or every search provider is down: the next lookup would fail the same way. */
+  unavailable?: boolean;
   changes: string[];
   notes: string[];
 }
@@ -294,6 +297,101 @@ export async function runPersonLookup(db: SupabaseClient, ai: Ai, { personId, jo
     return finish({ status: changes.length && hasClassYear && !findings.notes.length ? "succeeded" : "needs_review", changes, notes: findings.notes });
   } catch (error) {
     const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : String(error);
-    return finish({ status: "failed", changes: [], notes: [message] });
+    return finish({ status: "failed", changes: [], notes: [message], unavailable: error instanceof ModelUnavailableError || /search failed: (401|402|403|429)/.test(message) });
   }
+}
+
+export interface GapSummary {
+  /** Unclaimed profiles missing a class year, a job history or a location. */
+  total: number;
+  missingClassYear: number;
+  missingWork: number;
+  missingLocation: number;
+  /** Of those, the ones not looked up recently, most gaps first: what a bulk lookup takes next. */
+  next: string[];
+}
+
+const RECENT_MS = 14 * 86_400_000;
+const STILL_RUNNING_MS = 30 * 60_000;
+
+/**
+ * Unclaimed profiles with something a lookup could fill. A profile looked up
+ * in the last two weeks is counted but not queued again: what the web didn't
+ * say then, it won't say now, and each lookup spends free searches.
+ */
+export async function profilesWithGaps(db: SupabaseClient, now = new Date()): Promise<GapSummary> {
+  interface Row {
+    id: string;
+    place_id: number | null;
+    city: string | null;
+    educations: { grad_year: number | null }[];
+    positions: { id: string }[];
+    enrichment_jobs: { provider: string | null; status: string; created_at: string }[];
+  }
+  const rows: Row[] = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await db
+      .from("people")
+      .select("id, place_id, city, educations(grad_year), positions(id), enrichment_jobs(provider, status, created_at)")
+      .eq("status", "seeded")
+      .order("id")
+      .range(from, from + 499)
+      .returns<Row[]>();
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 500) break;
+  }
+  const summary: GapSummary = { total: 0, missingClassYear: 0, missingWork: 0, missingLocation: 0, next: [] };
+  const queue: { id: string; gaps: number }[] = [];
+  for (const p of rows) {
+    const noYear = !p.educations.some((e) => e.grad_year);
+    const noWork = p.positions.length < 2; // a single job is a current role, not a history
+    const noPlace = !p.place_id && !p.city;
+    if (!noYear && !noWork && !noPlace) continue;
+    summary.total++;
+    if (noYear) summary.missingClassYear++;
+    if (noWork) summary.missingWork++;
+    if (noPlace) summary.missingLocation++;
+    // A lookup that failed (search or model down) found out nothing, so it doesn't count.
+    // Nor does one that never finished (a run cut off mid-way), once it's clearly not still going.
+    const recent = p.enrichment_jobs.some((j) => {
+      if (j.provider !== LOOKUP_PROVIDER || j.status === "failed") return false;
+      const age = now.getTime() - Date.parse(j.created_at);
+      return j.status === "queued" || j.status === "running" ? age < STILL_RUNNING_MS : age < RECENT_MS;
+    });
+    if (!recent) queue.push({ id: p.id, gaps: Number(noYear) * 2 + Number(noWork) + Number(noPlace) });
+  }
+  summary.next = queue.sort((a, b) => b.gaps - a.gaps).map((q) => q.id);
+  return summary;
+}
+
+/**
+ * Runs queued lookups a few at a time. If the model or search goes down, the
+ * rest are marked failed without being tried: each would spend searches to
+ * learn the same thing. Failed lookups can be run again.
+ */
+export async function runLookupBatch(
+  db: SupabaseClient,
+  ai: Ai,
+  lookups: { personId: string; jobId: string }[],
+  { hint = null, concurrency = 2, onDone }: { hint?: string | null; concurrency?: number; onDone?: (lookup: { personId: string; jobId: string }, outcome: LookupOutcome) => void } = {},
+): Promise<{ done: number; stoppedEarly: boolean }> {
+  const queue = [...lookups];
+  let done = 0;
+  let down = false;
+  await Promise.all(
+    Array.from({ length: Math.max(1, concurrency) }, async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        if (down) {
+          await db.from("enrichment_jobs").update({ status: "failed", error: "Not tried: the AI model or web search wasn’t available. Search again later.", finished_at: new Date().toISOString() }).eq("id", next.jobId);
+          continue;
+        }
+        const outcome = await runPersonLookup(db, ai, { ...next, hint });
+        if (outcome.unavailable) down = true;
+        else done++;
+        onDone?.(next, outcome);
+      }
+    }),
+  );
+  return { done, stoppedEarly: down };
 }

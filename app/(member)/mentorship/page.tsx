@@ -6,6 +6,7 @@ import { CommunityTabs } from "@/components/community-tabs";
 import { Icon } from "@/components/icon";
 import { ResultNotice } from "@/components/notice";
 import { Avatar, EmptyState, PageTitle } from "@/components/person";
+import { formatSpecialties } from "@/lib/enrichment/format";
 import { createClient } from "@/lib/supabase/server";
 import { requireMember } from "@/lib/viewer";
 import { endMentorship, requestMentorship, respondToMentorship, setOpenToMentoring } from "./actions";
@@ -210,7 +211,7 @@ async function Mentorship({ searchParams }: { searchParams: PageProps<"/mentorsh
                     {(m.industries || m.specialties.length > 0) && (
                       <div className="od-cluster">
                         {m.industries && <span className="chip subtle">{m.industries.name}</span>}
-                        {m.specialties.slice(0, 3).map((s) => (
+                        {formatSpecialties(m.specialties).slice(0, 3).map((s) => (
                           <span key={s} className="chip">
                             {s}
                           </span>

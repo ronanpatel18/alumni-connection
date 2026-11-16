@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { searchConfigured } from "@/lib/enrichment/providers";
-import { type AddResult, addPeopleByName } from "@/lib/enrichment/save-person";
+import { type AddResult, addPeopleByName, profilesWithGaps } from "@/lib/enrichment/save-person";
 import { queueLookups, startLookups } from "@/lib/enrichment/start-lookups";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sanitizeString } from "@/lib/validation";
@@ -46,4 +47,18 @@ export async function searchAgain(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(personId)) return;
   await startLookups(await queueLookups([personId]), hint);
   revalidatePath("/admin/people");
+}
+
+// One click's worth: what fits in the time a request gets where there's no background queue.
+const GAP_BATCH = 15;
+
+/** Looks up the next batch of unclaimed profiles that are missing a class year, work history or location. */
+export async function lookUpGaps() {
+  await requireAdmin("/admin/people");
+  if (!searchConfigured()) redirect("/admin/people?gaps=nosearch");
+  const { next } = await profilesWithGaps(createAdminClient());
+  const batch = next.slice(0, GAP_BATCH);
+  await startLookups(await queueLookups(batch), null);
+  revalidatePath("/admin/people");
+  redirect(`/admin/people?gaps=${batch.length}`);
 }

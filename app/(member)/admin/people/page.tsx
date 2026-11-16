@@ -5,11 +5,11 @@ import { AdminTabs } from "@/components/admin-tabs";
 import { Icon } from "@/components/icon";
 import { EmptyState, PageTitle } from "@/components/person";
 import { searchProviders } from "@/lib/enrichment/providers";
-import { LOOKUP_PROVIDER } from "@/lib/enrichment/save-person";
+import { LOOKUP_PROVIDER, profilesWithGaps } from "@/lib/enrichment/save-person";
 import { formatDegree } from "@/lib/labels";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/viewer";
-import { searchAgain } from "./actions";
+import { lookUpGaps, searchAgain } from "./actions";
 import { AddPeopleForm, RefreshWhileSearching } from "./add-people-form";
 
 export const metadata: Metadata = { title: "Add people" };
@@ -66,8 +66,10 @@ function Status({ job, stalled }: { job: JobRow; stalled: boolean }) {
   return <span className="chip subtle">Needs a look</span>;
 }
 
-async function Added() {
+async function Added({ searchParams }: { searchParams: PageProps<"/admin/people">["searchParams"] }) {
   await requireAdmin("/admin/people");
+  const { gaps: started } = await searchParams;
+  const gaps = await profilesWithGaps(createAdminClient());
   const providers = searchProviders();
   const active = providers.filter((p) => p.active);
   const missing = providers.filter((p) => !p.active && p.keyName && p.name !== "tavily");
@@ -81,10 +83,32 @@ async function Added() {
         {active.length ? `Searching with ${active.map((p) => p.label).join(", ")}.` : "No web search is set up."}
         {missing.length > 0 && ` Not set up: ${missing.map((p) => `${p.label} (${p.keyName})`).join(", ")}.`}
       </p>
+      {gaps.total > 0 && (
+        <section className="panel pad">
+          <h2>Fill in what’s missing</h2>
+          <p className="small muted" style={{ margin: "12px 0 16px" }}>
+            {gaps.total} unclaimed {gaps.total === 1 ? "profile is" : "profiles are"} missing something a web lookup might find: {gaps.missingClassYear} without a
+            class year, {gaps.missingWork} without a work history, {gaps.missingLocation} without a location. Lookups only fill gaps; nothing an
+            administrator or the person set is changed.
+          </p>
+          {typeof started === "string" && (
+            <div className="notice success" role="status" style={{ marginBottom: 16 }}>
+              <Icon name="check" />
+              <div>{started === "nosearch" ? "No web search is set up, so nothing was looked up." : started === "0" ? "Everyone with gaps was looked up in the last two weeks." : `Looking up ${started} profiles now. Results appear below as each finishes.`}</div>
+            </div>
+          )}
+          <form action={lookUpGaps} className="form-actions" style={{ marginTop: 0 }}>
+            <button type="submit" className="btn primary" disabled={!gaps.next.length || active.length === 0 || searching}>
+              {gaps.next.length ? `Look up the next ${Math.min(15, gaps.next.length)}` : "All looked up recently"}
+            </button>
+            {gaps.next.length > 15 && <span className="meta">{gaps.next.length} still to look up, 15 at a time.</span>}
+          </form>
+        </section>
+      )}
       <section className="panel">
         <div className="table-title">
           <div className="section-head" style={{ margin: 0 }}>
-            <h2>Added by name</h2>
+            <h2>Looked up</h2>
             <span className="badge-count">{jobs.length}</span>
           </div>
           <p className="meta" style={{ marginTop: 8 }}>
@@ -99,7 +123,7 @@ async function Added() {
             </div>
           </div>
         ) : jobs.length === 0 ? (
-          <EmptyState title="Nobody added yet" text="People you add by name will appear here with what was found for each." />
+          <EmptyState title="Nobody looked up yet" text="People you add by name or look up will appear here with what was found for each." />
         ) : (
           <div className="table-wrap">
             <table className="responsive">
@@ -175,7 +199,7 @@ async function Added() {
   );
 }
 
-export default function AddPeoplePage() {
+export default function AddPeoplePage({ searchParams }: PageProps<"/admin/people">) {
   return (
     <>
       <PageTitle
@@ -185,7 +209,7 @@ export default function AddPeoplePage() {
       />
       <AdminTabs />
       <Suspense fallback={<div className="panel pad"><div className="skeleton big" /><div className="skeleton" /><div className="skeleton short" /></div>}>
-        <Added />
+        <Added searchParams={searchParams} />
       </Suspense>
     </>
   );

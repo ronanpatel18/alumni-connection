@@ -113,6 +113,19 @@ describe("selectSources", () => {
     expect(selectSources({ fullName: "Jane Doe", hint: "nurse" }, [profiles[0]]).linkedin?.result.url).toBe("https://www.linkedin.com/in/jane-doe-1");
   });
 
+  it("needs the employer on the page once we know where they work", () => {
+    const results = [
+      page("https://www.linkedin.com/in/jane-doe-1", "Jane Doe - Administrator", "University of Wisconsin-Madison School of Medicine"),
+      page("https://www.linkedin.com/in/jane-doe-2", "Jane Doe - CEO at Acme Foods", "Education: University of Wisconsin-Madison"),
+      page("https://news.wisc.edu/other-jane", "Jane Doe joins the neurology department", "Jane Doe (BS ’09) of the University of Wisconsin…"),
+      page("https://business.wisc.edu/board", "Wisconsin Business Alumni Board", "Jane Doe (BBA ’04), University of Wisconsin"),
+    ];
+    const { kept, linkedin } = selectSources({ fullName: "Jane Doe", organizationName: "Acme Foods" }, results);
+    expect(linkedin?.result.url).toBe("https://www.linkedin.com/in/jane-doe-2");
+    expect(kept.map((k) => k.result.url)).not.toContain("https://news.wisc.edu/other-jane");
+    expect(kept.map((k) => k.result.url)).toContain("https://business.wisc.edu/board");
+  });
+
   it("uses no LinkedIn profile when two fit equally well", () => {
     const { linkedin, notes } = selectSources({ fullName: "Jane Doe" }, [
       page("https://www.linkedin.com/in/jane-doe-1", "Jane Doe - Nurse", "University of Wisconsin-Madison"),
@@ -150,6 +163,23 @@ describe("lookupPerson", () => {
     expect(found.notes).toEqual([]);
   });
 
+  it("saves no class year when sources disagree, unless a UW–Madison page settles it", async () => {
+    const pages = (official: boolean) =>
+      (async (query: string) =>
+        query.includes("linkedin")
+          ? []
+          : [
+              page("https://example.com/bio", "Jane Doe bio", "Jane Doe (BBA ’94) studied at the University of Wisconsin."),
+              page(official ? "https://business.wisc.edu/board" : "https://example.org/board", "Jane Doe joins the board", "Jane Doe (BBA ’95), University of Wisconsin alumni board."),
+            ]) as typeof webSearch;
+    const unsure = await lookupPerson({ fullName: "Jane Doe" }, { ai, industries: [], search: pages(false) });
+    expect(unsure.educations.filter((e) => e.gradYear)).toEqual([]);
+    expect(unsure.notes.join(" ")).toMatch(/disagree on the BBA class year \(1994, 1995\)/);
+    const settled = await lookupPerson({ fullName: "Jane Doe" }, { ai, industries: [], search: pages(true) });
+    expect(settled.educations).toMatchObject([{ degree: "BBA", gradYear: 1995 }]);
+    expect(settled.notes).toEqual([]);
+  });
+
   it("says so when nothing ties the name to UW–Madison", async () => {
     const found = await lookupPerson({ fullName: "Jane Doe" }, { ai, industries: [], search: (async () => []) as typeof webSearch });
     expect(found.educations).toEqual([]);
@@ -178,5 +208,23 @@ describe("class years a speaker mentions", () => {
     const { findClassYears } = await import("@/lib/enrichment/class-year");
     const text = "“I missed my own graduation ceremony here in 1971 so I’m really going to enjoy this with the class of 2012,” says Bartz of the University of Wisconsin.";
     expect(findClassYears(text, { uwContext: true, about: { fullName: "Carol Bartz", pageIsAboutThem: true } })).toEqual([]);
+  });
+});
+
+describe("pages that list other alumni", () => {
+  it("doesn't take a sidebar's degree for the person the page is about", async () => {
+    const { findClassYears } = await import("@/lib/enrichment/class-year");
+    const text = "Tim Mattke was named CEO.\nBarrick “Rick” ’54, MD’57 passed away in California.\nRebekah Irwin ’96, MS’00, MA’03";
+    expect(findClassYears(text, { uwContext: true, about: { fullName: "Tim Mattke", pageIsAboutThem: true } })).toEqual([]);
+    expect(findClassYears("Tim Mattke (BBA ’90) was named CEO.", { uwContext: true, about: { fullName: "Tim Mattke", pageIsAboutThem: true } })).toMatchObject([{ degree: "BBA", year: 1990 }]);
+  });
+});
+
+describe("when the model can't be reached", () => {
+  it("saves nothing rather than trusting pattern matches alone", async () => {
+    const live = createAi(loadAiConfig({ AI_MODE: "fixture" }));
+    const failing = { ...live, config: { ...live.config, mode: "fixture" as const }, extractEnrichment: () => Promise.reject(new Error("429 quota")) };
+    const search = (async () => [page("https://news.wisc.edu/jane", "Jane Doe honored", "Jane Doe (BBA ’04) was honored by the University of Wisconsin.")]) as typeof webSearch;
+    await expect(lookupPerson({ fullName: "Jane Doe" }, { ai: failing, industries: [], search })).rejects.toThrow(/isn't available right now/);
   });
 });

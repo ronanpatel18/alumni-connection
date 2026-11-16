@@ -92,6 +92,19 @@ Failed and waiting emails show under **Administration → Pilot progress**.
 
 3. Deploy. After that, every push to `main` deploys automatically. A deploy does **not** update the database: when a push adds a file under `supabase/migrations/`, apply it (`npm run deploy:db`, step 1) or pages that need it will fail.
 
+### Daily job without Inngest
+
+`vercel.json` schedules `/api/cron/daily` once a day. It creates the follow-up reminders that
+have come due and retries notification emails. Set `CRON_SECRET` (any long random value) in
+Vercel's Production environment variables; Vercel sends it with each call, and the route
+refuses calls without it. Inngest does the same work more often once it's connected.
+
+### Search keys
+
+Adding people by name and "Fill in what's missing" (`/admin/people`) need at least one of
+`KEENABLE_API_KEY`, `SERPER_API_KEY`, `EXA_API_KEY`, `LINKUP_API_KEY`, `PARALLEL_API_KEY` in
+Production (see `.env.example` for each free allowance).
+
 ## 5. Make yourself an administrator
 
 Sign in once on the live site with your email, then in Supabase → SQL Editor:

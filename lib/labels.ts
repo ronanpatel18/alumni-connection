@@ -1,4 +1,5 @@
 // Plain display labels, safe to import from client components.
+import { formatEducation } from "@/lib/enrichment/format";
 
 export const OPEN_TO_LABELS: Record<string, string> = {
   networking: "Networking",
@@ -24,14 +25,12 @@ export const SENIORITY_LABELS: Record<string, string> = {
   owner: "Owner or founder",
 };
 
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** "BBA, Finance" — drops a major the degree already names, fixes lowercase majors. */
+/** "BS, Computer Science": the degree's short form and the major in title case, however they were stored. */
 export function formatDegree(degree: string | null, major: string | null): string | null {
-  const d = degree?.trim() || null;
-  let m = major?.trim() || null;
-  if (m && d && d.toLowerCase().includes(m.toLowerCase())) m = null;
-  return [d, m && capitalize(m)].filter(Boolean).join(", ") || null;
+  const { degree: d, major: found } = formatEducation(degree, major);
+  const m = found && d && d.toLowerCase().includes(found.toLowerCase()) ? null : found;
+  return [d, m].filter(Boolean).join(", ") || null;
 }
 
 /** Why a profile is in the admin review queue (codes from profile_review_reasons). */
