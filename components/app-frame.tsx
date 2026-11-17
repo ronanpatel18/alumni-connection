@@ -59,6 +59,17 @@ export function AppFrame({
     setMenuOpen(false);
   }
 
+  // On phones a tab row scrolls sideways; bring the current tab into view.
+  useEffect(() => {
+    for (const tab of document.querySelectorAll<HTMLElement>(".tabs [aria-current=page]")) {
+      const row = tab.parentElement;
+      if (!row || row.scrollWidth <= row.clientWidth) continue;
+      const rowBox = row.getBoundingClientRect();
+      const tabBox = tab.getBoundingClientRect();
+      row.scrollLeft += tabBox.left - rowBox.left - (rowBox.width - tabBox.width) / 2;
+    }
+  }, [pathname]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {

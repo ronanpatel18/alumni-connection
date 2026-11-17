@@ -18,7 +18,7 @@ async function Choices({ searchParams }: { searchParams: PageProps<"/discover/wh
   const { places } = await getVocabulary();
   // A plain GET form: the choice lives in the URL, so a view can be bookmarked.
   return (
-    <form className="panel pad" style={{ marginBottom: 24 }} method="get">
+    <form key={[goal, market].map(String).join("|")} className="panel pad" style={{ marginBottom: 24 }} method="get">
       <div className="form-grid">
         <div className="field">
           <label htmlFor="goal">What are you working toward?</label>

@@ -75,7 +75,7 @@ async function Businesses({ searchParams }: { searchParams: PageProps<"/business
   return (
     <>
       <ResultNotice result={result} messages={RESULTS} />
-      <form className="filter-row" action="/businesses" role="search" style={{ margin: "0 0 24px" }}>
+      <form key={[q, category, city].map(String).join("|")} className="filter-row" action="/businesses" role="search" style={{ margin: "0 0 24px" }}>
         <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Name, owner or what they do" aria-label="Search businesses" style={{ maxWidth: 280 }} />
         <select name="category" defaultValue={typeof category === "string" ? category : ""} aria-label="Category">
           <option value="">Every category</option>
@@ -172,7 +172,7 @@ async function Businesses({ searchParams }: { searchParams: PageProps<"/business
                 From profiles whose title says founder or owner. These aren’t listings; open a profile to learn more.
               </p>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap table-inset">
               <table className="responsive">
                 <thead>
                   <tr>

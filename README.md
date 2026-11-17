@@ -226,6 +226,11 @@ until they're redone, so run it again after changing the model.
 
 ### Contact details (emails and phone numbers)
 
+In the app: **Administration → Contact details → Search the next 10**. Each
+click searches ten unclaimed profiles that haven't been searched yet and lists
+what was found for each; "Search again" re-runs one person. The same search
+from the command line:
+
 ```bash
 npm run contacts            # dry run: what it found, where, and what it would do
 npm run contacts -- --write # saves it

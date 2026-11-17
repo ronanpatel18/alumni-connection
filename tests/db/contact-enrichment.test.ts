@@ -155,6 +155,19 @@ describe("contact_findings", () => {
   });
 });
 
+describe("contact_searches", () => {
+  it("is readable by administrators only, writable by no member, and goes when the profile does", async () => {
+    await sql("insert into contact_searches (person_id, status, pending) values ($1, 'done', 1)", [seededPerson]);
+    expect(await asUser(db, memberUser, () => sql("select 1 from contact_searches"))).toHaveLength(0);
+    expect(await asUser(db, adminUser, () => sql("select 1 from contact_searches"))).toHaveLength(1);
+    await expect(asUser(db, adminUser, () => sql("update contact_searches set status = 'running'"))).rejects.toThrow(/permission denied/);
+    await expect(asUser(db, memberUser, () => sql("insert into contact_searches (person_id) values ($1)", [ownerPerson]))).rejects.toThrow(/permission denied/);
+    // One row per person: a re-run overwrites it.
+    await expect(sql("insert into contact_searches (person_id) values ($1)", [seededPerson])).rejects.toThrow(/duplicate key/);
+    await sql("delete from contact_searches where person_id = $1", [seededPerson]);
+  });
+});
+
 describe("removal and suppression", () => {
   it("blocks a third-party email that belongs to someone who asked to be removed", async () => {
     await sql(

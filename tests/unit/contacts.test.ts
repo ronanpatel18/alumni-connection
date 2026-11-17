@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { attribute, extractCandidates, localPartMatchesName, normalizeUsPhone, verifyQuote } from "@/lib/enrichment/contacts/extract";
 import { buildSuppression, decide, findContactsFor, sha256 } from "@/lib/enrichment/contacts/pipeline";
 import { apollo, clay, companyPages, CONTACT_SOURCES, fecRecords, hunter, npiRegistry, peopleDataLabs, peopleSearch } from "@/lib/enrichment/contacts/sources";
+import { toPersonRef } from "@/lib/enrichment/contacts/run";
+import { withLinkTargets } from "@/lib/enrichment/free-sources";
 import { missingOwnContacts } from "@/lib/own-contacts";
 import type { PersonRef, RawFinding, SearchHit, SourceContext, Verification } from "@/lib/enrichment/contacts/types";
 import { checkMx, hunterVerdict, verifyEmail, verifyPhone } from "@/lib/enrichment/contacts/validate";
@@ -263,6 +265,29 @@ describe("sources", () => {
     expect(found.every((f) => f.source === "web" && f.sourceDetail === "lakeshore.example.com" && verifyQuote(f))).toBe(true);
   });
 
+  it("company pages: asks every provider for the employer search, and reads a page only once", async () => {
+    const asked: { query: string; spread?: string; domains?: string[] }[] = [];
+    const fetched: string[] = [];
+    const ctx = context({
+      search: async (query, options) => (asked.push({ query, spread: options.spread, domains: options.includeDomains }), [hit("https://lakeshore.example.com/team"), hit("https://www.lakeshore.example.com/team/")]),
+      fetchPage: async (url) => (fetched.push(url), TEAM_PAGE),
+    });
+    await companyPages.find(person(), ctx);
+    expect(asked).toEqual([
+      { query: '"Jane Kowalczyk"', spread: undefined, domains: ["lakeshore.example.com"] },
+      { query: '"Jane Kowalczyk" "Lakeshore Capital Partners"', spread: "all", domains: undefined },
+    ]);
+    expect(fetched).toEqual(["https://lakeshore.example.com/team"]);
+  });
+
+  it("company pages: reads at most six pages, the person's own page first", async () => {
+    const fetched: string[] = [];
+    const hits = [...Array.from({ length: 8 }, (_, i) => hit(`https://news.example.org/story-${i}`)), hit("https://lakeshore.example.com/team/jane-kowalczyk")];
+    await companyPages.find(person({ orgDomain: null }), context({ search: async () => hits, fetchPage: async (url) => (fetched.push(url), null) }));
+    expect(fetched).toHaveLength(6);
+    expect(fetched[0]).toBe("https://lakeshore.example.com/team/jane-kowalczyk");
+  });
+
   it("a blocked page yields nothing rather than a guess", async () => {
     const ctx = context({ search: async () => [hit("https://lakeshore.example.com/team")], fetchPage: async () => null });
     expect(await companyPages.find(person(), ctx)).toEqual([]);
@@ -361,11 +386,65 @@ describe("findContactsFor", () => {
     expect(calls).toEqual([]);
   });
 
+  it("runs free sources side by side, and spends a licensed lookup only while a confident work email is missing", async () => {
+    const order: string[] = [];
+    const source = (id: string, tier: "free" | "keyed", findings: RawFinding[] = []) => ({
+      id,
+      label: id,
+      tier,
+      status: () => ({ enabled: true }),
+      find: async () => {
+        order.push(`${id}:start`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push(`${id}:end`);
+        return findings;
+      },
+    });
+    const verified = raw({ verification: ok("valid") });
+    const report = await findContactsFor(person(), [source("a", "free", [verified]), source("b", "free"), source("licensed", "keyed")], ctx([]), noSuppression);
+    expect(order).toEqual(["a:start", "b:start", "a:end", "b:end"]);
+    expect(report.sourcesTried).toEqual(["a", "b"]);
+    expect(report.findings.map((f) => f.status)).toEqual(["stored"]);
+
+    order.length = 0;
+    const without = await findContactsFor(person(), [source("a", "free"), source("licensed", "keyed")], ctx([]), noSuppression);
+    expect(without.sourcesTried).toEqual(["a", "licensed"]);
+  });
+
   it("reports a failing source as a note and carries on", async () => {
     const broken = { ...companyPages, id: "broken", label: "Broken source", find: async () => Promise.reject(new Error("search is down")) };
     const report = await findContactsFor(person(), [broken, clay], ctx([]), noSuppression);
     expect(report.notes).toEqual(["Broken source: search is down", expect.stringMatching(/stub adapter/)]);
     expect(report.findings).toEqual([]);
+  });
+});
+
+describe("reading a team page's links", () => {
+  it("writes mailto: and tel: targets beside the link text, so 'Email Jane' yields her address", () => {
+    const html = `<h2>Jane Kowalczyk</h2><p>Managing Director</p><a class="btn" href="mailto:jane.kowalczyk@lakeshore.example.com?subject=Hello">Email Jane</a> <a href='tel:+16082620002'>Call</a>`;
+    const text = withLinkTargets(html).replace(/<[^>]+>/g, " ");
+    const found = extractCandidates(text).map((c) => c.value);
+    expect(found).toEqual(["jane.kowalczyk@lakeshore.example.com", "+16082620002"]);
+    expect(attribute(person(), text, extractCandidates(text)[0])).toEqual({ confidence: 0.95, label: "work" });
+  });
+
+  it("leaves a link alone when its text already shows the value, or it isn't a contact link", () => {
+    const same = `<a href="mailto:jane@lakeshore.example.com">jane@lakeshore.example.com</a> <a href="tel:6082620002">(608) 262-0002</a> <a href="/team">Team</a> <a href="tel:411">Info</a>`;
+    expect(withLinkTargets(same)).toBe(`jane@lakeshore.example.com (608) 262-0002 <a href="/team">Team</a> Info`);
+  });
+});
+
+describe("the person a search is run for", () => {
+  const row = { id: "p1", institution_id: "i1", full_name: "Jane Q. Kowalczyk, CFA", first_name: null, last_name: null, current_title: null, city: null, state: null, industries: null, contact_points: [] };
+
+  it("takes names from the full name without credentials, and the employer's domain from its website", () => {
+    const ref = toPersonRef({ ...row, organizations: { name: "Lakeshore", domain: null, website: "https://www.lakeshore.example.com/about" } });
+    expect([ref.firstName, ref.lastName, ref.orgDomain]).toEqual(["Jane", "Kowalczyk", "lakeshore.example.com"]);
+  });
+
+  it("prefers the stored first and last name and the stored domain", () => {
+    const ref = toPersonRef({ ...row, first_name: "Janet", last_name: "Kowalczyk-Reyes", organizations: { name: "Lakeshore", domain: "LSCP.example.com", website: "https://other.example.com" } });
+    expect([ref.firstName, ref.lastName, ref.orgDomain]).toEqual(["Janet", "Kowalczyk-Reyes", "lscp.example.com"]);
   });
 });
 

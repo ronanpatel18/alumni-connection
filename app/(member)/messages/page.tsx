@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { LocalTime } from "@/components/local-time";
 import { EmptyState, PageTitle } from "@/components/person";
 import { RelationshipTabs } from "@/components/relationship-tabs";
 import { createClient } from "@/lib/supabase/server";
@@ -49,7 +50,7 @@ async function Conversations() {
           <span className="small">{c.subject}</span>
           <span className="meta">
             {c.last_body ? `${c.last_body}${c.last_body.length >= 140 ? "…" : ""} · ` : ""}
-            {new Date(c.last_message_at).toLocaleDateString()}
+            <LocalTime iso={c.last_message_at} dateOnly />
           </span>
         </Link>
       ))}

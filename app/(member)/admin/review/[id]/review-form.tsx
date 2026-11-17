@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
 import { Icon } from "@/components/icon";
+import { useKeptInputAction } from "@/components/use-kept-input-action";
 import { ALUMNI_STATUS_LABELS, REVIEW_REASON_LABELS } from "@/lib/labels";
 import { type ReviewState, reviewProfile } from "../../actions";
 
@@ -39,14 +39,14 @@ function Field({ id, label, error, help, children }: { id: string; label: string
 }
 
 export function ReviewForm({ defaults, reasons, industries }: { defaults: ReviewDefaults; reasons: string[]; industries: IndustryGroup[] }) {
-  const [state, action, pending] = useActionState<ReviewState, FormData>(reviewProfile, { status: "idle" });
+  const [state, submit, pending] = useKeptInputAction<ReviewState>(reviewProfile, { status: "idle" });
   const errors = state.status === "error" ? (state.fields ?? {}) : {};
   const err = (key: string) => (errors[key] ? { "aria-invalid": true, "aria-describedby": `${key}-error` } : {});
   // Existing degrees plus one blank row for a degree the sources mention but we don't have.
   const educations = [...defaults.educations, { id: "", degree: "", major: "", school: "", grad_year: "" }];
 
   return (
-    <form action={action} className="stack" noValidate>
+    <form onSubmit={submit} className="stack" noValidate>
       <input type="hidden" name="person_id" value={defaults.person_id} />
       {state.status === "error" && (
         <div className="notice error" role="alert">

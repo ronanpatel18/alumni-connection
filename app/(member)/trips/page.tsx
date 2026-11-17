@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Icon } from "@/components/icon";
 import { EmptyState, PageTitle } from "@/components/person";
 import { createClient } from "@/lib/supabase/server";
-import { type Trip, tripCity, tripDates } from "@/lib/trips";
+import { type Trip, tripCity, tripDates, tripIsOver } from "@/lib/trips";
 import { requireMember } from "@/lib/viewer";
 
 export const metadata: Metadata = { title: "Trips" };
@@ -21,10 +21,10 @@ async function TripList({ searchParams }: { searchParams: PageProps<"/trips">["s
     .eq("owner_user_id", viewer.userId)
     .order("starts_on", { ascending: true })
     .returns<TripWithCount[]>();
-  const today = new Date().toISOString().slice(0, 10);
   const trips = data ?? [];
-  const upcoming = trips.filter((t) => t.ends_on >= today);
-  const past = trips.filter((t) => t.ends_on < today).reverse();
+  const now = new Date();
+  const upcoming = trips.filter((t) => !tripIsOver(t, now));
+  const past = trips.filter((t) => tripIsOver(t, now)).reverse();
 
   const row = (t: TripWithCount, isUpcoming: boolean) => {
     const selected = t.trip_shortlist[0]?.count ?? 0;

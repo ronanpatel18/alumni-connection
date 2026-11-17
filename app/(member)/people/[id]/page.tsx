@@ -6,6 +6,7 @@ import { BackToSearch } from "@/components/back-to-search";
 import { DialogButton } from "@/components/dialog-button";
 import { Icon } from "@/components/icon";
 import { Avatar, LinkedInLink, OPEN_TO_LABELS, PageTitle, SaveButton, StatusBadge, isConfirmed } from "@/components/person";
+import { formatUsPhone } from "@/lib/enrichment/contacts/extract";
 import { formatDegree } from "@/lib/labels";
 import { FIELD_LABELS, SOURCE_LABELS } from "@/lib/provenance";
 import { createClient } from "@/lib/supabase/server";
@@ -411,6 +412,10 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
                           ) : kind === "linkedin" || kind === "website" ? (
                             <a className="small od-truncate" href={p.value} target="_blank" rel="noreferrer noopener">
                               {p.value.replace(/^https?:\/\/(www\.)?/, "")}
+                            </a>
+                          ) : kind === "phone" ? (
+                            <a className="small" href={`tel:${p.value.replace(/[^\d+]/g, "")}`}>
+                              {formatUsPhone(p.value)}
                             </a>
                           ) : (
                             <span className="small">{p.value}</span>

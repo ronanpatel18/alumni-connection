@@ -158,3 +158,12 @@ const ZONE_BY_STATE: Record<string, string> = {
 export function tripTimeZone(trip: Pick<Trip, "places">): string {
   return ZONE_BY_STATE[trip.places?.state ?? ""] ?? "America/Chicago";
 }
+
+/**
+ * Whether the trip's last day has passed where the trip is. Comparing with the
+ * UTC date would call a trip that ends today "past" from the US evening on.
+ */
+export function tripIsOver(trip: Pick<Trip, "ends_on" | "places">, now = new Date()): boolean {
+  const todayThere = now.toLocaleDateString("en-CA", { timeZone: tripTimeZone(trip) }); // YYYY-MM-DD
+  return trip.ends_on < todayThere;
+}

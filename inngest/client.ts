@@ -9,4 +9,5 @@ export const EVENTS = {
   summaryBackfill: "people/summaries.backfill",
   embeddingsBackfill: "people/embeddings.backfill",
   personLookup: "people/lookup.requested",
+  contactSearch: "people/contacts.requested",
 } as const;

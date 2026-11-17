@@ -133,15 +133,21 @@ export async function findContactsFor(
 
   const context: SourceContext = { ...ctx, note: (message) => report.notes.push(message) };
   const raw: RawFinding[] = [];
-  for (const source of sources) {
-    // Free public listings always run; licensed APIs are spent only while a confident work email is still missing.
-    if (source.tier !== "free" && source.id !== "fec" && satisfied(raw, "email")) continue;
+  const ask = async (source: ContactSource) => {
     report.sourcesTried.push(source.id);
     try {
-      raw.push(...(await source.find(person, context)));
+      return await source.find(person, context);
     } catch (error) {
       report.notes.push(`${source.label}: ${String((error as Error).message).slice(0, 140)}`);
+      return [];
     }
+  };
+  // Free public listings always run, side by side.
+  raw.push(...(await Promise.all(sources.filter((s) => s.tier === "free").map(ask))).flat());
+  for (const source of sources.filter((s) => s.tier !== "free")) {
+    // Licensed APIs are spent only while a confident work email is still missing.
+    if (source.id !== "fec" && satisfied(raw, "email")) continue;
+    raw.push(...(await ask(source)));
   }
 
   const decided = await decide(person, raw, suppression, (f) =>

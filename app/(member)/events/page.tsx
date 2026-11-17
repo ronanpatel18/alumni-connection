@@ -55,7 +55,7 @@ async function Events({ searchParams }: { searchParams: PageProps<"/events">["se
   return (
     <>
       <ResultNotice result={result} messages={RESULTS} />
-      <form className="filter-row" action="/events" style={{ margin: "0 0 24px" }}>
+      <form key={[city, when].map(String).join("|")} className="filter-row" action="/events" style={{ margin: "0 0 24px" }}>
         <select name="city" defaultValue={chosen} aria-label="City">
           <option value="">Every city</option>
           {cities.map((c) => (

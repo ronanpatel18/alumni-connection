@@ -102,7 +102,8 @@ export async function decideClaim(formData: FormData) {
     p_approve: parsed.data.decision === "approve",
   });
   const result = error ? "error" : ((data as { status: string; reason?: string }).reason ?? (data as { status: string }).status);
-  if (result === "approved") await deliverNotifications(); // emails the claimant a link to setup
+  // The claim is decided; a failed email is retried by the outbox job, so it mustn’t fail the decision.
+  if (result === "approved") await deliverNotifications().catch(() => undefined); // emails the claimant a link to setup
   revalidatePath("/admin/claims");
   redirect(`/admin/claims?result=${result}`);
 }

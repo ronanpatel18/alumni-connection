@@ -73,7 +73,8 @@ export interface SearchHit {
 
 /** Network access handed to sources, so tests can run them offline. */
 export interface SourceContext {
-  search(query: string, options: { maxResults: number; includeDomains?: string[] }): Promise<SearchHit[]>;
+  /** `spread: "all"` asks every search provider at once (better coverage, one search from each allowance). */
+  search(query: string, options: { maxResults: number; includeDomains?: string[]; spread?: "one" | "all" }): Promise<SearchHit[]>;
   /** A page as plain text, or null when it can't be read (blocked, not HTML, missing). */
   fetchPage(url: string): Promise<string | null>;
   fetchJson(url: string, init?: { headers?: Record<string, string> }): Promise<unknown>;

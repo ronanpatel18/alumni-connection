@@ -1,7 +1,7 @@
 # Build progress
 
 What is finished, what is partly done and what is left, against the build phases in
-[ARCHITECTURE.md §10](ARCHITECTURE.md). Updated 2026-11-12. Update this file whenever a feature lands.
+[ARCHITECTURE.md §10](ARCHITECTURE.md). Updated 2026-11-16. Update this file whenever a feature lands.
 
 Status words: **Done** (built, tested, in the app) · **Partly** (usable, with a named gap) · **Not started**.
 
@@ -18,7 +18,7 @@ Scaffold, AI mode switch, AI provider layer, design tokens, core migrations and 
 | Claim and verify | **Done** | `/claim`, `/admin/claims` |
 | Directory with filters | **Done** | `/search`, `/search/ask` |
 | Profile editing and privacy | **Done** | `/me` |
-| Contact details | **Done** | `/admin/contacts`, `npm run contacts` |
+| Contact details | **Done**. 2026-11-16: emails and phone numbers are found from the site (`/admin/contacts` → "Search the next 10"), not only the command line; each profile's outcome is kept in `contact_searches`. Findings stay private until an administrator approves them. | `/admin/contacts`, `lib/enrichment/contacts/`, `npm run contacts`, migration `…contact_searches` |
 | Saved contacts and notes | **Done** | `/saved`, profile pages |
 | Admin review queue | **Done** | `/admin/review` |
 
@@ -74,7 +74,7 @@ This ran against the local database. Production needs the same run from `/admin/
 
 ## To do before or at deploy
 
-1. **Push the eight `20261112…` migrations to production** (`npm run deploy:db`). Deploys don't migrate; until this runs, the new pages error in production.
+1. **Push the eight `20261112…` migrations and `20261116000100_contact_searches` to production** (`npm run deploy:db`). Deploys don't migrate; until this runs, the new pages error in production.
 2. **Set `CRON_SECRET` in Vercel** (any long random value). `vercel.json` schedules `/api/cron/daily`, which creates follow-up reminders and retries notification emails. Without the secret the job is refused and reminders aren't emailed (Inngest does the same job where it's set up).
 3. **Run "Fill in what's missing" on production** (`/admin/people`), 15 profiles per click, after the deploy.
 

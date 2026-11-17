@@ -24,7 +24,10 @@ export const LINKEDIN_HOSTS = ["linkedin.com"];
 export const PEOPLE_SEARCH_HOSTS = ["spokeo.com", "whitepages.com", "beenverified.com", "truepeoplesearch.com", "fastpeoplesearch.com", "radaris.com", "intelius.com", "peoplefinders.com"];
 export const REGISTRY_HOSTS = ["wisbar.org", "licensesearch.wi.gov", "dsps.wi.gov", "brokercheck.finra.org", "adviserinfo.sec.gov", "sec.gov", "wisc.edu"];
 // Contact-data vendors' teaser pages show masked or licensed values: use their APIs, not their pages.
-const VENDOR_HOSTS = ["rocketreach.co", "zoominfo.com", "contactout.com", "signalhire.com", "apollo.io", "lusha.com", "datanyze.com", "hunter.io", "clay.com", "peopledatalabs.com"];
+const VENDOR_HOSTS = [
+  "rocketreach.co", "zoominfo.com", "contactout.com", "signalhire.com", "apollo.io", "lusha.com", "datanyze.com", "hunter.io", "clay.com", "peopledatalabs.com",
+  "prospeo.io", "finalscout.com", "leadiq.com", "seamless.ai", "adapt.io", "salesql.com", "snov.io", "skrapp.io", "anymailfinder.com", "emailsherlock.com", "aeroleads.com",
+];
 const SOCIAL_HOSTS = ["facebook.com", "twitter.com", "x.com", "instagram.com", "tiktok.com", "youtube.com", "pinterest.com"];
 
 interface PageOptions {
@@ -59,17 +62,33 @@ export function findingsInText(person: PersonRef, text: string, url: string, opt
   return out;
 }
 
+// Pages downloaded for one search: enough to reach the person's own page without crawling a site.
+const MAX_PAGES = 6;
+
 /** Reads each hit's snippet and, when `readPages` allows, the page behind it. */
 async function fromHits(person: PersonRef, hits: SearchHit[], ctx: SourceContext, options: PageOptions & { readPages: boolean }): Promise<RawFinding[]> {
   const out: RawFinding[] = [];
+  const last = person.lastName.toLowerCase();
+  const toRead: SearchHit[] = [];
+  const seen = new Set<string>();
   for (const hit of hits) {
+    const key = hit.url.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
     const snippet = `${hit.title}\n${hit.snippet}`;
     out.push(...findingsInText(person, snippet, hit.url, options));
     // Only download pages whose snippet already names the person.
-    if (!options.readPages || !snippet.toLowerCase().includes(person.lastName.toLowerCase())) continue;
-    const page = await ctx.fetchPage(hit.url);
-    if (page) out.push(...findingsInText(person, page, hit.url, options));
+    if (options.readPages && snippet.toLowerCase().includes(last)) toRead.push(hit);
   }
+  // Their own page ("/team/jane-doe") and the employer's site come first.
+  const rank = (hit: SearchHit) => (hit.url.toLowerCase().includes(last) ? 0 : 2) + (person.orgDomain && onAny(hit.url, [person.orgDomain]) ? 0 : 1);
+  const pages = await Promise.all(
+    toRead
+      .sort((a, b) => rank(a) - rank(b))
+      .slice(0, MAX_PAGES)
+      .map(async (hit) => ({ hit, page: await ctx.fetchPage(hit.url).catch(() => null) })),
+  );
+  for (const { hit, page } of pages) if (page) out.push(...findingsInText(person, page, hit.url, options));
   return out;
 }
 
@@ -84,15 +103,13 @@ export const companyPages: ContactSource = {
   status: always,
   async find(person, ctx) {
     const skip = [...LINKEDIN_HOSTS, ...PEOPLE_SEARCH_HOSTS, ...VENDOR_HOSTS, ...SOCIAL_HOSTS];
-    const queries: { query: string; includeDomains?: string[] }[] = [];
-    if (person.orgDomain) queries.push({ query: quoted(person), includeDomains: [person.orgDomain] });
-    if (person.organizationName) queries.push({ query: `${quoted(person)} "${person.organizationName}" email OR phone OR contact` });
-    const out: RawFinding[] = [];
-    for (const q of queries) {
-      const hits = (await ctx.search(q.query, { maxResults: 5, includeDomains: q.includeDomains })).filter((h) => !onAny(h.url, skip));
-      out.push(...(await fromHits(person, hits, ctx, { source: "web", readPages: true })));
-    }
-    return out;
+    const searches: Promise<SearchHit[]>[] = [];
+    if (person.orgDomain) searches.push(ctx.search(quoted(person), { maxResults: 5, includeDomains: [person.orgDomain] }));
+    // Providers disagree on which pages matter, and the person's own team page
+    // is the one worth finding: this search asks all of them.
+    if (person.organizationName) searches.push(ctx.search(`${quoted(person)} "${person.organizationName}"`, { maxResults: 5, spread: "all" }));
+    const hits = (await Promise.all(searches)).flat().filter((h) => !onAny(h.url, skip));
+    return fromHits(person, hits, ctx, { source: "web", readPages: true });
   },
 };
 

@@ -58,19 +58,16 @@ async function Engagement() {
     <div className="stack">
       <section className="panel">
         <div className="summary-strip" style={{ borderBottom: 0 }}>
-          <div>
+          <div className="od-stat">
             <strong>{m.members}</strong>
-            <br />
             <span>Verified members · {m.new_members_30d} joined in the last 30 days</span>
           </div>
-          <div>
+          <div className="od-stat">
             <strong>{m.active_30d}</strong>
-            <br />
             <span>Active in the last 30 days · {percent(m.active_30d, m.members)} of members</span>
           </div>
-          <div>
+          <div className="od-stat">
             <strong>{m.claimed_profiles}</strong>
-            <br />
             <span>
               Profiles claimed · {percent(m.claimed_profiles, m.profiles)} of {m.profiles} in the directory
             </span>
@@ -99,7 +96,7 @@ async function Engagement() {
             Counts only. Who messaged whom, private notes and saved lists are never shown here.
           </p>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap table-inset">
           <table className="responsive">
             <thead>
               <tr>

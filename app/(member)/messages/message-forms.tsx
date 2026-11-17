@@ -39,7 +39,7 @@ export function ComposeForm({
       <ErrorNotice state={state} />
       <div className="field">
         <label htmlFor="compose-subject">Subject</label>
-        <input id="compose-subject" name="subject" defaultValue={subject} maxLength={200} />
+        <input id="compose-subject" name="subject" defaultValue={state.status === "error" ? (state.subject ?? subject) : subject} maxLength={200} />
       </div>
       <div className="field">
         <label htmlFor="compose-body">Message</label>

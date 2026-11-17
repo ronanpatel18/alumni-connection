@@ -35,17 +35,22 @@ export async function logInteraction(_prev: FormState, formData: FormData): Prom
   if (!summary && !follow_up_on) return { status: "error", message: "Add a note about what happened, a date to follow up, or both." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("interactions").insert({
-    owner_user_id: viewer.userId,
-    person_id,
-    kind,
-    occurred_at: occurred_on ? atMorning(occurred_on) : null,
-    summary: summary || null,
-    follow_up_at: follow_up_on ? atMorning(follow_up_on) : null,
-  });
+  const { data: row, error } = await supabase
+    .from("interactions")
+    .insert({
+      owner_user_id: viewer.userId,
+      person_id,
+      kind,
+      occurred_at: occurred_on ? atMorning(occurred_on) : null,
+      summary: summary || null,
+      follow_up_at: follow_up_on ? atMorning(follow_up_on) : null,
+    })
+    .select("id")
+    .single();
   if (error) return { status: "error", message: "That couldn’t be saved. Try again." };
   revalidatePath("/followups");
-  redirect(`/followups?result=${follow_up_on ? "reminder" : "logged"}`);
+  // The saved id makes each save's address new, so the form is cleared even after two saves in a row.
+  redirect(`/followups?result=${follow_up_on ? "reminder" : "logged"}&saved=${row.id}`);
 }
 
 /** Marks a follow-up done, or reopens it. */

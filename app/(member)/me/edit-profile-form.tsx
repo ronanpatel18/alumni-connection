@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
 import { Icon } from "@/components/icon";
+import { useKeptInputAction } from "@/components/use-kept-input-action";
 import { OPEN_TO_LABELS } from "@/lib/labels";
 import { type FormState, saveProfile } from "./actions";
 
@@ -51,12 +51,12 @@ export function EditProfileForm({
   industries: { sector: string; options: Option[] }[];
   confirmed: boolean;
 }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(saveProfile, { status: "idle" });
+  const [state, submit, pending] = useKeptInputAction<FormState>(saveProfile, { status: "idle" });
   const errors = state.status === "error" ? (state.fields ?? {}) : {};
   const invalid = (key: string) => (errors[key] ? { "aria-invalid": true, "aria-describedby": `${key}-error` } : {});
 
   return (
-    <form action={action} className="narrow panel pad">
+    <form onSubmit={submit} className="narrow panel pad">
       {state.status === "saved" ? (
         <div className="notice success" role="status">
           <Icon name="check" />

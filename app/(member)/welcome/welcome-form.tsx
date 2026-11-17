@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
 import { Icon } from "@/components/icon";
+import { useKeptInputAction } from "@/components/use-kept-input-action";
 import { OPEN_TO_LABELS } from "@/lib/labels";
 import { confirmProfile, type WelcomeState } from "./actions";
 
@@ -16,9 +16,9 @@ export interface WelcomeDefaults {
 }
 
 export function WelcomeForm({ defaults, places }: { defaults: WelcomeDefaults; places: { value: string; label: string }[] }) {
-  const [state, action, pending] = useActionState<WelcomeState, FormData>(confirmProfile, { status: "idle" });
+  const [state, submit, pending] = useKeptInputAction<WelcomeState>(confirmProfile, { status: "idle" });
   return (
-    <form action={action} className="narrow panel pad">
+    <form onSubmit={submit} className="narrow panel pad">
       {state.status === "error" && (
         <div className="notice error" role="alert" style={{ marginBottom: 24 }}>
           <Icon name="info" />

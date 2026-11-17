@@ -90,11 +90,105 @@
 dialog {
   margin: auto;
 }
+/* Form controls: inputs and selects share one height, and selects draw their own
+   arrow so it sits at the same inset in every browser and at every width. */
+:root {
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%235d6871' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b1bbc3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+:root[data-theme="dark"] {
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b1bbc3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+input:not([type="checkbox"], [type="radio"], [type="file"]),
+select {
+  line-height: 22px;
+}
+select:not([multiple], [size]) {
+  appearance: none;
+  padding-right: 40px;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+input:not([type="checkbox"], [type="radio"], [type="file"]) {
+  text-overflow: ellipsis;
+}
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+/* A disabled button looks disabled whatever its variant (primary, danger). */
+button.btn:disabled,
+button.btn:disabled:hover,
+.btn[aria-disabled="true"],
+.btn[aria-disabled="true"]:hover {
+  background: var(--surface-warm);
+  color: var(--muted);
+  border-color: var(--border-soft);
+  cursor: not-allowed;
+}
+/* Beside the tablet sidebar a person's details would wrap in a narrow column
+   next to the buttons; put the buttons under the details, as on phones. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .person {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+  .person-actions {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+}
+/* Beside the tablet sidebar two form columns get too narrow for their labels
+   and values (labels wrap unevenly, choices are cut off); stack the fields. */
+@media (max-width: 1023px) {
+  form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Filter rows: inputs match the selects beside them; in a .stretch row each
+   line of controls fills the width instead of leaving a ragged edge. */
+.filter-row input:not([type="checkbox"], [type="radio"]) {
+  font-size: var(--text-sm);
+  padding: 8px 12px;
+}
+.filter-row input[type="number"] {
+  width: 128px;
+}
+@media (min-width: 768px) {
+  .filter-row.stretch > select,
+  .filter-row.stretch > input {
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 767px) {
+  .filter-row select {
+    min-width: 0;
+  }
+  .filter-row input:not([type="checkbox"], [type="radio"]) {
+    flex: 1 1 40%;
+    width: 100%;
+    font-size: var(--text-xs);
+  }
+}
 /* The prototype hides the account block on phones; keep it (and Sign out)
    reachable inside the open menu. */
 @media (max-width: 767px) {
   .app.menu-open .account {
     display: flex;
+  }
+}
+/* On a short laptop screen the sidebar would push Sign out below the fold;
+   drop the decorative note instead. */
+@media (min-width: 768px) and (max-height: 900px) {
+  .chapter-note {
+    display: none;
   }
 }
 /* Admin review: each degree is its own bordered group. */
@@ -303,16 +397,30 @@ dialog {
   flex: none;
   white-space: nowrap;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   /* One scrolling row, so a tab that doesn't fit doesn't drop below the underline. */
   .tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
   }
+  /* Run the row to the edges of the page area, so a tab that doesn't fit is cut
+     at the edge (clearly scrollable) rather than mid-page. */
+  .content .tabs {
+    margin-inline: -24px;
+    padding-inline: 24px;
+    scroll-padding-inline: 24px;
+  }
   .tabs a {
     flex: none;
     white-space: nowrap;
+  }
+}
+@media (max-width: 767px) {
+  .content .tabs {
+    margin-inline: -20px;
+    padding-inline: 20px;
+    scroll-padding-inline: 20px;
   }
   .profile-heading > .od-cluster {
     width: 100%;
@@ -320,6 +428,22 @@ dialog {
   .profile-heading > .od-cluster > * {
     flex: none;
   }
+}
+/* A stacked column never grows past its track for one long unbroken line
+   (a truncated URL, an email). */
+.stack,
+.detail-list,
+.detail-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .right-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.right-rail .btn {
+  max-width: 100%;
+  white-space: normal;
 }
 /* Each person in a result list is its own card, with space between cards
    (search, discover, saved contacts, trip shortlists). */
@@ -361,8 +485,16 @@ dialog {
 @media (max-width: 767px) {
   .topbar.mobile-only {
     min-height: 56px;
-    padding: 8px 16px;
+    padding: 8px 20px;
     justify-content: space-between;
+  }
+  /* The open menu starts right under the 61px bar, which already shows the name. */
+  .app.menu-open .sidebar {
+    top: 61px;
+    height: calc(100dvh - 61px);
+  }
+  .app.menu-open .sidebar > .brand {
+    display: none;
   }
 }
 /* Icons inside a control always take the control's own text colour and a fixed
@@ -386,6 +518,23 @@ dialog {
 .filter-chip .od-icon {
   --od-icon-size: 14px;
 }
+/* Phones: a long header link wraps beside the brand instead of running off-screen. */
+@media (max-width: 767px) {
+  .public-header .brand {
+    flex: none;
+  }
+  .public-header .btn {
+    min-width: 0;
+    white-space: normal;
+    text-align: right;
+  }
+  .public-header .header-lead {
+    display: none;
+  }
+  .auth-form {
+    padding-inline: 28px;
+  }
+}
 /* Brand mark: the "a" and its dot sit on one line, and the name never wraps. */
 .brand-symbol {
   display: inline-flex;
@@ -397,4 +546,97 @@ dialog {
 }
 .brand-name {
   white-space: nowrap;
+}
+/* Page fixes (relationships, community, admin) */
+/* A table under a panel title starts and ends at the title's 24px inset. */
+@media (min-width: 768px) {
+  .table-inset :is(th, td):first-child {
+    padding-left: 24px;
+  }
+  .table-inset :is(th, td):last-child {
+    padding-right: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .table-inset table.responsive tr {
+    padding-inline: 24px;
+  }
+  table.responsive td.mono[data-label]::before {
+    font-family: var(--font-body);
+  }
+}
+/* Insights: on narrower screens the two filters share the width evenly. */
+@media (max-width: 1023px) {
+  #insight-filters > .field {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  #insight-filters select {
+    min-width: 0;
+  }
+}
+/* Profile review queue on a tablet: each person on one line, their reasons
+   below, and the button beside them, instead of three cramped columns. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .review-queue thead {
+    display: none;
+  }
+  .review-queue tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    row-gap: 12px;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .review-queue tr:last-child {
+    border-bottom: 0;
+  }
+  .review-queue.table-inset td {
+    padding: 0;
+    border: 0;
+  }
+  .review-queue td:nth-child(2) {
+    grid-row: 2;
+  }
+  .review-queue td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+/* Contact findings (admin): on desktop the person and decision columns keep
+   a readable width; on tablets each finding stacks beside its decisions. */
+@media (min-width: 1024px) {
+  .findings-queue th:first-child {
+    min-width: 168px;
+  }
+  .findings-queue td:last-child {
+    min-width: 200px;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .findings-queue thead {
+    display: none;
+  }
+  .findings-queue tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 168px;
+    column-gap: 24px;
+    row-gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .findings-queue tr:last-child {
+    border-bottom: 0;
+  }
+  .findings-queue.table-inset td {
+    grid-column: 1;
+    padding: 0;
+    border: 0;
+  }
+  .findings-queue.table-inset td:last-child {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
 }
