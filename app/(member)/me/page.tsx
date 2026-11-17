@@ -16,7 +16,7 @@ async function EditProfile() {
   const [profile, { industries, places }] = await Promise.all([loadMyProfile(viewer), getVocabulary()]);
   if (!profile) return <NoProfileNotice />;
 
-  const education = [...profile.educations].sort((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))[0];
+  const education = profile.educations.toSorted((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))[0];
   const sectors = industries.filter((i) => i.parent_id === null);
   return (
     <EditProfileForm

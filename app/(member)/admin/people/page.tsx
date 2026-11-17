@@ -125,7 +125,7 @@ async function Added({ searchParams }: { searchParams: PageProps<"/admin/people"
         ) : jobs.length === 0 ? (
           <EmptyState title="Nobody looked up yet" text="People you add by name or look up will appear here with what was found for each." />
         ) : (
-          <div className="table-wrap table-inset">
+          <div className="table-wrap table-inset" role="region" aria-label="People looked up" tabIndex={0}>
             <table className="responsive">
               <thead>
                 <tr>

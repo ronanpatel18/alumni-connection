@@ -96,7 +96,7 @@ async function Engagement() {
             Counts only. Who messaged whom, private notes and saved lists are never shown here.
           </p>
         </div>
-        <div className="table-wrap table-inset">
+        <div className="table-wrap table-inset" role="region" aria-label="What members did in the last 30 days" tabIndex={0}>
           <table className="responsive">
             <thead>
               <tr>

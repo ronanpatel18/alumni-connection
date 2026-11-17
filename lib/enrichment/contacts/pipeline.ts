@@ -86,7 +86,7 @@ export async function decide(
   const byValue = new Map<string, RawFinding[]>();
   for (const f of proven) byValue.set(`${f.kind}:${f.value}`, [...(byValue.get(`${f.kind}:${f.value}`) ?? []), f]);
   const merged = [...byValue.values()].map((group) => {
-    const best = [...group].sort((a, b) => Number(a.patternGuessed) - Number(b.patternGuessed) || b.confidence - a.confidence)[0];
+    const best = group.toSorted((a, b) => Number(a.patternGuessed) - Number(b.patternGuessed) || b.confidence - a.confidence)[0];
     const independent = new Set(group.map((g) => g.sourceDetail)).size;
     return { ...best, confidence: Math.min(0.99, best.confidence + (independent > 1 ? 0.05 : 0)) };
   });

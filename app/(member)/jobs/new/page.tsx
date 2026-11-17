@@ -70,7 +70,7 @@ async function NewJob() {
           </div>
           <div className="field">
             <label htmlFor="url">Link to the posting (optional)</label>
-            <input id="url" name="url" type="url" maxLength={500} placeholder="https://" />
+            <input id="url" name="url" type="url" maxLength={500} placeholder="https://" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
           </div>
           <div className="field full">
             <label htmlFor="description">About the role</label>

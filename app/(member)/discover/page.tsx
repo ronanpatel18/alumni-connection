@@ -89,21 +89,23 @@ export default function DiscoverPage() {
             <label className="search-label" id="search-label" htmlFor="discovery-search">
               Who would you like to meet, and why?
             </label>
-            <form className="search-box" action="/search/ask" role="search">
-              <Icon name="search" />
-              <input
-                id="discovery-search"
-                name="ask"
-                maxLength={500}
-                required
-                placeholder="Describe them: “I’m moving to Chicago and want to meet people in real estate”"
-                autoComplete="off"
-                aria-describedby="discovery-search-help"
-              />
-              <button type="submit" className="btn primary">
-                Find people <Icon name="arrow" />
-              </button>
-            </form>
+            <search>
+              <form className="search-box" action="/search/ask">
+                <Icon name="search" />
+                <input
+                  id="discovery-search"
+                  name="ask"
+                  maxLength={500}
+                  required
+                  placeholder="Describe them: “I’m moving to Chicago and want to meet people in real estate”"
+                  autoComplete="off"
+                  aria-describedby="discovery-search-help"
+                />
+                <button type="submit" className="btn primary">
+                  Find people <Icon name="arrow" />
+                </button>
+              </form>
+            </search>
             <p id="discovery-search-help" className="search-hints" style={{ marginTop: 12 }}>
               <span className="chip ai">AI-assisted</span>
               <span>Say it in your own words. You’ll get people, the facts behind each suggestion, and filters you can correct.</span>

@@ -72,7 +72,7 @@ async function Queue({ searchParams }: { searchParams: PageProps<"/admin/review"
             text="New profiles with missing or unconfirmed details will appear here. A clear queue doesn’t mean every profile is confirmed."
           />
         ) : (
-          <div className="table-wrap table-inset review-queue">
+          <div className="table-wrap table-inset review-queue" role="region" aria-label="Profile review queue" tabIndex={0}>
             <table className="responsive">
               <thead>
                 <tr>

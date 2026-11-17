@@ -75,27 +75,29 @@ async function Businesses({ searchParams }: { searchParams: PageProps<"/business
   return (
     <>
       <ResultNotice result={result} messages={RESULTS} />
-      <form key={[q, category, city].map(String).join("|")} className="filter-row" action="/businesses" role="search" style={{ margin: "0 0 24px" }}>
-        <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Name, owner or what they do" aria-label="Search businesses" style={{ maxWidth: 280 }} />
-        <select name="category" defaultValue={typeof category === "string" ? category : ""} aria-label="Category">
-          <option value="">Every category</option>
-          {categories.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select name="city" defaultValue={typeof city === "string" ? city : ""} aria-label="City">
-          <option value="">Every city</option>
-          {cities.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <button type="submit" className="btn">
-          Search
-        </button>
-        <Link className="btn primary" href="/businesses/new" style={{ marginLeft: "auto" }}>
-          <Icon name="plus" /> List your business
-        </Link>
-      </form>
+      <search>
+        <form key={[q, category, city].map(String).join("|")} className="filter-row" action="/businesses" style={{ margin: "0 0 24px" }}>
+          <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Name, owner or what they do" aria-label="Search businesses" enterKeyHint="search" autoCorrect="off" spellCheck={false} style={{ maxWidth: 280 }} />
+          <select name="category" defaultValue={typeof category === "string" ? category : ""} aria-label="Category">
+            <option value="">Every category</option>
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+          <select name="city" defaultValue={typeof city === "string" ? city : ""} aria-label="City">
+            <option value="">Every city</option>
+            {cities.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+          <button type="submit" className="btn">
+            Search
+          </button>
+          <Link className="btn primary" href="/businesses/new" style={{ marginLeft: "auto" }}>
+            <Icon name="plus" /> List your business
+          </Link>
+        </form>
+      </search>
       <div className="stack">
         <section className="panel">
           <div className="table-title" style={{ paddingBottom: listings.length ? 0 : 24 }}>
@@ -172,7 +174,7 @@ async function Businesses({ searchParams }: { searchParams: PageProps<"/business
                 From profiles whose title says founder or owner. These aren’t listings; open a profile to learn more.
               </p>
             </div>
-            <div className="table-wrap table-inset">
+            <div className="table-wrap table-inset" role="region" aria-label="Founders and owners in the directory" tabIndex={0}>
               <table className="responsive">
                 <thead>
                   <tr>

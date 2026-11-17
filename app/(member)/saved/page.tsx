@@ -46,7 +46,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
     .map((row) => row.people)
     .filter((p): p is NonNullable<SavedRow["people"]> => Boolean(p))
     .map((p) => {
-      const edu = [...p.educations].sort((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))[0];
+      const edu = p.educations.toSorted((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))[0];
       return {
         id: p.id,
         full_name: p.full_name,
@@ -95,10 +95,12 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
 async function SavedSearch({ searchParams }: { searchParams: PageProps<"/saved">["searchParams"] }) {
   const { q } = await searchParams;
   return (
-    <form key={String(q)} className="field" style={{ maxWidth: 480, marginBottom: 24 }} action="/saved" role="search">
-      <label htmlFor="saved-search">Find a saved contact</label>
-      <input id="saved-search" name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Search name, company, or city" />
-    </form>
+    <search>
+      <form key={String(q)} className="field" style={{ maxWidth: 480, marginBottom: 24 }} action="/saved">
+        <label htmlFor="saved-search">Find a saved contact</label>
+        <input id="saved-search" name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Search name, company, or city" enterKeyHint="search" autoCorrect="off" spellCheck={false} />
+      </form>
+    </search>
   );
 }
 

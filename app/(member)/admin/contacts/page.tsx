@@ -150,7 +150,7 @@ async function Finder({ started }: { started: string | undefined }) {
         </form>
       </div>
       {rows.length > 0 && (
-        <div className="table-wrap table-inset">
+        <div className="table-wrap table-inset" role="region" aria-label="Latest contact searches" tabIndex={0}>
           <table className="responsive">
             <thead>
               <tr>
@@ -213,7 +213,7 @@ function Decision({ finding, decision, label, primary }: { finding: FindingRow; 
 
 function Findings({ rows, stored }: { rows: FindingRow[]; stored: boolean }) {
   return (
-    <div className="table-wrap table-inset findings-queue">
+    <div className="table-wrap table-inset findings-queue" role="region" aria-label="Contact findings" tabIndex={0}>
       <table className="responsive">
         <thead>
           <tr>

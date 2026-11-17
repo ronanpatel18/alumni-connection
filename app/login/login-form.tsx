@@ -70,6 +70,9 @@ export function LoginForm({ next, linkError }: { next: string; linkError: boolea
           name="email"
           type="email"
           autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           aria-invalid={error ? true : undefined}
           aria-describedby={`signin-email-help${error ? " signin-email-error" : ""}`}

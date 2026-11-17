@@ -67,7 +67,7 @@ async function NewBusiness() {
           </div>
           <div className="field full">
             <label htmlFor="website">Website (optional)</label>
-            <input id="website" name="website" type="url" maxLength={500} placeholder="https://" />
+            <input id="website" name="website" type="url" maxLength={500} placeholder="https://" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
           </div>
           <div className="field full">
             <label htmlFor="description">What you do</label>

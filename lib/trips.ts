@@ -63,7 +63,7 @@ export async function tripCandidates(db: SupabaseClient, trip: Trip): Promise<Pe
 }
 
 const goalHash = (trip: Trip) =>
-  createHash("sha256").update(`trip:${trip.id}:${trip.place_id}:${[...trip.industry_slugs].sort().join(",")}:${trip.goal ?? ""}`).digest("hex");
+  createHash("sha256").update(`trip:${trip.id}:${trip.place_id}:${trip.industry_slugs.toSorted().join(",")}:${trip.goal ?? ""}`).digest("hex");
 
 /**
  * One "why this person" line per candidate, tied to the trip's goal (shown as

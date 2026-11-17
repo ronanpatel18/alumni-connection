@@ -72,7 +72,7 @@ async function NewEvent() {
           </div>
           <div className="field full">
             <label htmlFor="url">Link for tickets or a video call (optional)</label>
-            <input id="url" name="url" type="url" maxLength={500} placeholder="https://" />
+            <input id="url" name="url" type="url" maxLength={500} placeholder="https://" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
           </div>
         </div>
         <label className="checkbox" style={{ marginTop: 16 }}>

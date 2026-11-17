@@ -62,101 +62,103 @@ async function SearchFilters({ searchParams }: { searchParams: Promise<SearchPar
   return (
     // Keyed by the URL: the fields are uncontrolled, so a link that changes the
     // filters would otherwise leave them showing (and resubmitting) the old search.
-    <form key={hrefWith(params, {})} id="search-form" action="/search" role="search">
-      <label className="search-label" htmlFor="query">
-        Search the alumni network
-      </label>
-      <div className="search-box">
-        <Icon name="search" />
-        <input id="query" name="q" defaultValue={first(params.q)} placeholder="Industry, city, name, class year, or goal" />
-        <button type="submit" className="btn primary">
-          Search alumni
-        </button>
-      </div>
-      <div className="filter-row stretch">
-        <label className="sr-only" htmlFor="industry">
-          Industry
+    <search>
+      <form key={hrefWith(params, {})} id="search-form" action="/search">
+        <label className="search-label" htmlFor="query">
+          Search the alumni network
         </label>
-        <select id="industry" name="industry" defaultValue={first(params.industry)}>
-          <option value="">All industries</option>
-          {sectors.map((sector) => (
-            <optgroup key={sector.id} label={sector.name}>
-              <option value={sector.slug}>All of {sector.name}</option>
-              {industries
-                .filter((i) => i.parent_id === sector.id)
-                .map((i) => (
-                  <option key={i.id} value={i.slug}>
-                    {i.name}
+        <div className="search-box">
+          <Icon name="search" />
+          <input id="query" name="q" defaultValue={first(params.q)} placeholder="Industry, city, name, class year, or goal" enterKeyHint="search" autoCorrect="off" spellCheck={false} />
+          <button type="submit" className="btn primary">
+            Search alumni
+          </button>
+        </div>
+        <div className="filter-row stretch">
+          <label className="sr-only" htmlFor="industry">
+            Industry
+          </label>
+          <select id="industry" name="industry" defaultValue={first(params.industry)}>
+            <option value="">All industries</option>
+            {sectors.map((sector) => (
+              <optgroup key={sector.id} label={sector.name}>
+                <option value={sector.slug}>All of {sector.name}</option>
+                {industries
+                  .filter((i) => i.parent_id === sector.id)
+                  .map((i) => (
+                    <option key={i.id} value={i.slug}>
+                      {i.name}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="place">
+            City
+          </label>
+          <select id="place" name="place" defaultValue={first(params.place)}>
+            <option value="">All cities</option>
+            {places.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}, {p.state}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="radius">
+            Radius
+          </label>
+          <select id="radius" name="radius" defaultValue={radius.defaultValue}>
+            {radius.options.map(({ value, label }) => (
+              <option key={label} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="from">
+            Class from
+          </label>
+          <input id="from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={first(params.from)} />
+          <label className="sr-only" htmlFor="to">
+            Class to
+          </label>
+          <input id="to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={first(params.to)} />
+          <label className="sr-only" htmlFor="open">
+            Open to
+          </label>
+          <select id="open" name="open" defaultValue={first(params.open)}>
+            <option value="">Any openness</option>
+            {Object.entries(OPEN_TO_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          {groups.length > 0 && (
+            <>
+              <label className="sr-only" htmlFor="group">
+                Group
+              </label>
+              <select id="group" name="group" defaultValue={first(params.group)}>
+                <option value="">All groups</option>
+                {groups.map((g) => (
+                  <option key={g.slug} value={g.slug}>
+                    {g.name}
                   </option>
                 ))}
-            </optgroup>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="place">
-          City
-        </label>
-        <select id="place" name="place" defaultValue={first(params.place)}>
-          <option value="">All cities</option>
-          {places.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}, {p.state}
-            </option>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="radius">
-          Radius
-        </label>
-        <select id="radius" name="radius" defaultValue={radius.defaultValue}>
-          {radius.options.map(({ value, label }) => (
-            <option key={label} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="from">
-          Class from
-        </label>
-        <input id="from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={first(params.from)} />
-        <label className="sr-only" htmlFor="to">
-          Class to
-        </label>
-        <input id="to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={first(params.to)} />
-        <label className="sr-only" htmlFor="open">
-          Open to
-        </label>
-        <select id="open" name="open" defaultValue={first(params.open)}>
-          <option value="">Any openness</option>
-          {Object.entries(OPEN_TO_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        {groups.length > 0 && (
-          <>
-            <label className="sr-only" htmlFor="group">
-              Group
-            </label>
-            <select id="group" name="group" defaultValue={first(params.group)}>
-              <option value="">All groups</option>
-              {groups.map((g) => (
-                <option key={g.slug} value={g.slug}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        <label className="checkbox">
-          <input type="checkbox" name="confirmed" value="1" defaultChecked={first(params.confirmed) === "1"} />
-          Confirmed only
-        </label>
-        <Link className="btn quiet" href="/search">
-          Clear filters
-        </Link>
-      </div>
-      <AutoSubmit formId="search-form" />
-    </form>
+              </select>
+            </>
+          )}
+          <label className="checkbox">
+            <input type="checkbox" name="confirmed" value="1" defaultChecked={first(params.confirmed) === "1"} />
+            Confirmed only
+          </label>
+          <Link className="btn quiet" href="/search">
+            Clear filters
+          </Link>
+        </div>
+        <AutoSubmit formId="search-form" />
+      </form>
+    </search>
   );
 }
 

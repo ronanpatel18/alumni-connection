@@ -104,8 +104,8 @@ async function Review({ params }: { params: PageProps<"/admin/review/[id]">["par
           state: person.state ?? "",
           industry_id: person.industry_id ? String(person.industry_id) : "",
           alumni_status: person.alumni_status,
-          educations: [...person.educations]
-            .sort((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))
+          educations: person.educations
+            .toSorted((a, b) => (a.grad_year ?? 9999) - (b.grad_year ?? 9999))
             .map((e) => ({
               id: e.id,
               degree: e.degree ?? "",

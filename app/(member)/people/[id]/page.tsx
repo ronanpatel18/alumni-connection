@@ -145,7 +145,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
   // Main job first (the one in their headline), then other current roles, then past jobs, newest first.
   const isMain = (p: ProfileRow["positions"][number]) =>
     p.is_current && p.title === person.current_title && (!person.organizations || p.organization_name === person.organizations.name);
-  const positions = [...person.positions].sort(
+  const positions = person.positions.toSorted(
     (a, b) =>
       Number(isMain(b)) - Number(isMain(a)) ||
       Number(b.is_current) - Number(a.is_current) ||
@@ -170,7 +170,7 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
     state: person.state,
     specialties: person.specialties ?? [],
     bio: person.bio,
-    educations: [...person.educations].sort((x, y) => (x.grad_year ?? 0) - (y.grad_year ?? 0)).map((e) => ({ school: e.school, degree: e.degree, major: e.major, gradYear: e.grad_year })),
+    educations: person.educations.toSorted((x, y) => (x.grad_year ?? 0) - (y.grad_year ?? 0)).map((e) => ({ school: e.school, degree: e.degree, major: e.major, gradYear: e.grad_year })),
     positions: person.positions.map((p) => ({ title: p.title, organizationName: p.organization_name, isCurrent: p.is_current, startYear: Number(year(p.start_date)) || null, endYear: Number(year(p.end_date)) || null })),
   });
 

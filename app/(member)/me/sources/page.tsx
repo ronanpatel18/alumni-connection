@@ -20,7 +20,7 @@ async function Sources() {
   if (!profile) return <NoProfileNotice />;
 
   const byField = new Map<string, (typeof profile.field_provenance)[number]>();
-  for (const row of [...profile.field_provenance].sort((a, b) => SOURCE_PRIORITY.indexOf(a.source) - SOURCE_PRIORITY.indexOf(b.source))) {
+  for (const row of profile.field_provenance.toSorted((a, b) => SOURCE_PRIORITY.indexOf(a.source) - SOURCE_PRIORITY.indexOf(b.source))) {
     if (!byField.has(row.field)) byField.set(row.field, row);
   }
   const rows = [...byField.values()].sort((a, b) => (FIELD_LABELS[a.field] ?? a.field).localeCompare(FIELD_LABELS[b.field] ?? b.field));
@@ -36,7 +36,7 @@ async function Sources() {
       {rows.length === 0 ? (
         <p className="pad small muted">Nothing has been recorded yet. Details you add to your profile will appear here with their source.</p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap" role="region" aria-label="Where each detail came from" tabIndex={0}>
           <table className="responsive">
             <thead>
               <tr>

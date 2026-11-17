@@ -45,6 +45,9 @@ export function ClaimEmailForm({ token }: { token: string }) {
           name="email"
           type="email"
           autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           aria-invalid={error ? true : undefined}
           aria-describedby={`claim-email-help${error ? " claim-email-error" : ""}`}

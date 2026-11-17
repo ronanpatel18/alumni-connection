@@ -63,27 +63,29 @@ async function Jobs({ searchParams }: { searchParams: PageProps<"/jobs">["search
   return (
     <>
       <ResultNotice result={result} messages={RESULTS} />
-      <form key={[q, industry, refer].map(String).join("|")} className="filter-row" action="/jobs" role="search" style={{ margin: "0 0 24px" }}>
-        <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Title, employer or city" aria-label="Search jobs" style={{ maxWidth: 280 }} />
-        <select name="industry" defaultValue={typeof industry === "string" ? industry : ""} aria-label="Industry">
-          <option value="">Every industry</option>
-          {industries.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <label className="checkbox">
-          <input type="checkbox" name="refer" value="1" defaultChecked={refer === "1"} />
-          Poster will refer
-        </label>
-        <button type="submit" className="btn">
-          Search
-        </button>
-        <Link className="btn primary" href="/jobs/new" style={{ marginLeft: "auto" }}>
-          <Icon name="plus" /> Post a job
-        </Link>
-      </form>
+      <search>
+        <form key={[q, industry, refer].map(String).join("|")} className="filter-row" action="/jobs" style={{ margin: "0 0 24px" }}>
+          <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Title, employer or city" aria-label="Search jobs" enterKeyHint="search" autoCorrect="off" spellCheck={false} style={{ maxWidth: 280 }} />
+          <select name="industry" defaultValue={typeof industry === "string" ? industry : ""} aria-label="Industry">
+            <option value="">Every industry</option>
+            {industries.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <label className="checkbox">
+            <input type="checkbox" name="refer" value="1" defaultChecked={refer === "1"} />
+            Poster will refer
+          </label>
+          <button type="submit" className="btn">
+            Search
+          </button>
+          <Link className="btn primary" href="/jobs/new" style={{ marginLeft: "auto" }}>
+            <Icon name="plus" /> Post a job
+          </Link>
+        </form>
+      </search>
       {jobs.length === 0 ? (
         <section className="panel">
           <EmptyState

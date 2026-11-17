@@ -29,29 +29,31 @@ async function AskForm({ searchParams }: { searchParams: Promise<AskParams> }) {
   const ask = askText(await searchParams);
   return (
     // Keyed by the request, so following an example link refills the box.
-    <form key={ask} action="/search/ask" role="search" className="panel pad">
-      <div className="field">
-        <label htmlFor="ask">Who would you like to meet, and why?</label>
-        <textarea
-          id="ask"
-          name="ask"
-          defaultValue={ask}
-          maxLength={ASK_MAX_LENGTH}
-          rows={3}
-          style={{ minHeight: 96 }}
-          required
-          placeholder="For example: I’m moving to Austin and want to break into climate tech venture capital, ideally someone from the 2010s who mentors."
-          aria-describedby="ask-help"
-        />
-        <small id="ask-help">Mention a city, field, class years or what you hope to learn. You can correct what was understood afterwards.</small>
-      </div>
-      <div className="form-actions" style={{ marginTop: 16 }}>
-        <button type="submit" className="btn primary">
-          Find people
-        </button>
-        <span className="chip ai">AI-assisted · Explainable suggestions</span>
-      </div>
-    </form>
+    <search>
+      <form key={ask} action="/search/ask" className="panel pad">
+        <div className="field">
+          <label htmlFor="ask">Who would you like to meet, and why?</label>
+          <textarea
+            id="ask"
+            name="ask"
+            defaultValue={ask}
+            maxLength={ASK_MAX_LENGTH}
+            rows={3}
+            style={{ minHeight: 96 }}
+            required
+            placeholder="For example: I’m moving to Austin and want to break into climate tech venture capital, ideally someone from the 2010s who mentors."
+            aria-describedby="ask-help"
+          />
+          <small id="ask-help">Mention a city, field, class years or what you hope to learn. You can correct what was understood afterwards.</small>
+        </div>
+        <div className="form-actions" style={{ marginTop: 16 }}>
+          <button type="submit" className="btn primary">
+            Find people
+          </button>
+          <span className="chip ai">AI-assisted · Explainable suggestions</span>
+        </div>
+      </form>
+    </search>
   );
 }
 

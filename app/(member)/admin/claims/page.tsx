@@ -69,7 +69,7 @@ async function Claims({ searchParams }: { searchParams: PageProps<"/admin/claims
         {!requests?.length ? (
           <EmptyState title="No pending requests" text="Claims that can’t be matched by email will appear here." />
         ) : (
-          <div className="table-wrap table-inset">
+          <div className="table-wrap table-inset" role="region" aria-label="Pending claim requests" tabIndex={0}>
             <table className="responsive">
               <thead>
                 <tr>

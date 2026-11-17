@@ -90,6 +90,27 @@
 dialog {
   margin: auto;
 }
+/* Scrolling inside an open dialog, or over its backdrop, must not scroll the
+   page behind it. Both rules are needed: ::backdrop isn't a scroll container,
+   so it ignores overscroll-behavior unless it clips its overflow. */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+/* Full-height shells follow the visible viewport on phones (100vh is the
+   height with the browser's toolbars hidden, so the page ran past the fold). */
+.app,
+.auth-shell {
+  min-height: 100dvh;
+}
+/* Visually hidden but announced: clip-path replaces the deprecated clip. */
+.sr-only {
+  clip: auto;
+  clip-path: inset(50%);
+}
 /* Form controls: inputs and selects share one height, and selects draw their own
    arrow so it sits at the same inset in every browser and at every width. */
 :root {
@@ -168,13 +189,15 @@ button.btn:disabled:hover,
   }
 }
 @media (max-width: 767px) {
+  /* At least 16px: iOS Safari zooms the page into any smaller field on focus. */
   .filter-row select {
     min-width: 0;
+    font-size: max(1rem, 1em);
   }
   .filter-row input:not([type="checkbox"], [type="radio"]) {
     flex: 1 1 40%;
     width: 100%;
-    font-size: var(--text-xs);
+    font-size: max(1rem, 1em);
   }
 }
 /* The prototype hides the account block on phones; keep it (and Sign out)

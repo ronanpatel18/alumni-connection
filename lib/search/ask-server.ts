@@ -150,7 +150,7 @@ export async function rankShortlist(db: SupabaseClient, userId: string, request:
   const retrievalOrder = people.map((p) => p.id);
   const none: Ranking = { order: retrievalOrder, reasons: new Map(), aiOrdered: false };
   if (!people.length) return none;
-  const goalHash = hashOf("ask:v1", request, ...[...retrievalOrder].sort());
+  const goalHash = hashOf("ask:v1", request, ...retrievalOrder.toSorted());
 
   try {
     const { data: cached } = await db

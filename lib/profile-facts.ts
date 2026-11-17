@@ -44,11 +44,11 @@ export async function loadProfileFacts(
       state: data.state,
       specialties: data.specialties,
       bio: data.bio,
-      educations: [...data.educations]
-        .sort((a, b) => (a.grad_year ?? 0) - (b.grad_year ?? 0))
+      educations: data.educations
+        .toSorted((a, b) => (a.grad_year ?? 0) - (b.grad_year ?? 0))
         .map((e) => ({ school: e.school, degree: e.degree, major: e.major, gradYear: e.grad_year })),
-      positions: [...data.positions]
-        .sort((a, b) => Number(b.is_current) - Number(a.is_current) || (b.start_date ?? "").localeCompare(a.start_date ?? ""))
+      positions: data.positions
+        .toSorted((a, b) => Number(b.is_current) - Number(a.is_current) || (b.start_date ?? "").localeCompare(a.start_date ?? ""))
         .map((p) => ({
           title: p.title,
           organizationName: p.organization_name,

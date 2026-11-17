@@ -58,7 +58,7 @@ function Preview({ result }: { result: Extract<RosterState, { status: "preview" 
   const { preview, fileName, ignoredColumns } = result;
   const total = preview.rows.length;
   // What needs a decision comes first.
-  const rows = [...preview.rows].sort((a, b) => STATUS[a.status].order - STATUS[b.status].order || a.row - b.row);
+  const rows = preview.rows.toSorted((a, b) => STATUS[a.status].order - STATUS[b.status].order || a.row - b.row);
   const statuses = (Object.keys(STATUS) as RosterStatus[]).sort((a, b) => STATUS[a].order - STATUS[b].order);
 
   return (
@@ -106,7 +106,7 @@ function Preview({ result }: { result: Extract<RosterState, { status: "preview" 
         </div>
       </div>
       {total > 0 && (
-        <div className="table-wrap table-inset">
+        <div className="table-wrap table-inset" role="region" aria-label="Roster preview" tabIndex={0}>
           <table className="responsive">
             <thead>
               <tr>
