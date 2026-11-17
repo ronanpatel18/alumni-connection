@@ -20,7 +20,7 @@ export const keepProfilesCurrent = inngest.createFunction(
       const { count, error } = await createAdminClient()
         .from("people")
         .select("id", { count: "exact", head: true })
-        .is("ai_summary", null)
+        .or("ai_summary.is.null,summary_input_hash.is.null")
         .neq("status", "opted_out");
       if (error) throw error;
       return count ?? 0;

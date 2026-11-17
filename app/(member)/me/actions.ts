@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { OPEN_TO_VALUES } from "@/lib/ai/schemas";
 import { loadMyProfile } from "@/lib/my-profile";
+import { refreshSummaryLater } from "@/lib/refresh-summary";
 import { hashLinkToken, newLinkToken, removeByLink } from "@/lib/profile-links";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -50,7 +51,7 @@ function fieldErrors(error: z.ZodError) {
 }
 
 export async function saveProfile(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireMember("/me");
+  const viewer = await requireMember("/me");
   const parsed = profileSchema.safeParse({
     full_name: formData.get("full_name") ?? "",
     current_title: formData.get("current_title") ?? "",
@@ -73,6 +74,8 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
   });
   if (error) return { status: "error", message: "We couldn’t save your profile. Your changes are still here; try again." };
 
+  const { data: mine } = await supabase.from("people").select("id").eq("claimed_by_user_id", viewer.userId).maybeSingle<{ id: string }>();
+  if (mine) refreshSummaryLater(mine.id);
   revalidatePath("/", "layout");
   return { status: "saved", message: "Profile saved. Your edits now replace what came from public sources." };
 }

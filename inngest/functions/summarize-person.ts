@@ -1,10 +1,10 @@
-import { getAi, factsHash } from "@/lib/ai";
-import { embeddingText, loadProfileFacts } from "@/lib/profile-facts";
+import { getAi } from "@/lib/ai";
+import { summarizePerson as writeSummary } from "@/lib/summaries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EVENTS, inngest } from "../client";
 
 /**
- * Writes a profile's AI summary and embedding from its stored facts.
+ * Writes a profile's three-bullet summary and embedding from its stored facts.
  * Skips the model entirely when the facts haven't changed since the last run.
  */
 export const summarizePerson = inngest.createFunction(
@@ -15,49 +15,10 @@ export const summarizePerson = inngest.createFunction(
     retries: 3,
   },
   async ({ event, step }) => {
-    const personId = String(event.data.personId);
-    const db = createAdminClient();
-
-    const loaded = await step.run("load facts", () => loadProfileFacts(db, personId));
-    if (!loaded) return { status: "not_found" };
-
-    const hash = factsHash(loaded.facts);
-    if (hash === loaded.summaryInputHash && !event.data.force) return { status: "unchanged" };
-
-    const result = await step.run("summarize and embed", async () => {
-      const ai = getAi();
-      const summary = await ai.summarizeProfile(loaded.facts);
-      const [embedding] = await ai.embed([embeddingText(loaded.facts, summary.summary)]);
-      return { ...summary, embedding, embeddingModel: ai.embedModel };
-    });
-
-    await step.run("save", async () => {
-      const { error } = await db
-        .from("people")
-        .update({
-          ai_summary: result.summary,
-          summary_input_hash: hash,
-          embedding: JSON.stringify(result.embedding),
-          embedding_model: result.embeddingModel,
-        })
-        .eq("id", personId);
-      if (error) throw error;
-
-      await db.from("field_provenance").upsert(
-        { person_id: personId, field: "ai_summary", source: "ai", confidence: result.confidence, fetched_at: new Date().toISOString() },
-        { onConflict: "person_id,field,source" },
-      );
-      await db.from("enrichment_jobs").insert({
-        person_id: personId,
-        kind: "summary",
-        status: result.confidence < 0.5 ? "needs_review" : "succeeded",
-        provider: result.model,
-        attempts: 1,
-        finished_at: new Date().toISOString(),
-      });
-    });
-
-    return { status: "summarized", model: result.model, confidence: result.confidence };
+    const status = await step.run("summarize and save", () =>
+      writeSummary(createAdminClient(), getAi(), String(event.data.personId), { force: Boolean(event.data.force) }),
+    );
+    return { status };
   },
 );
 
@@ -69,7 +30,7 @@ export const backfillSummaries = inngest.createFunction(
       const { data, error } = await createAdminClient()
         .from("people")
         .select("id")
-        .is("ai_summary", null)
+        .or("ai_summary.is.null,summary_input_hash.is.null")
         .neq("status", "opted_out")
         .limit(5000);
       if (error) throw error;
