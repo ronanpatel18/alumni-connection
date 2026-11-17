@@ -1,3 +1,4 @@
+import { threeBullets } from "@/lib/summaries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -159,6 +160,19 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
   const groups = person.group_memberships.map((m) => m.groups).filter((g): g is { slug: string; name: string } => Boolean(g));
   const bioSource = person.field_provenance.find((p) => p.field === "bio");
   const linkedin = person.contact_points.find((p) => p.kind === "linkedin");
+  // Every profile opens with three bullets: the stored summary, topped up from the profile's own details.
+  const glance = threeBullets(person.ai_summary, {
+    fullName: person.full_name,
+    currentTitle: person.current_title,
+    organizationName: person.organizations?.name ?? null,
+    industryName: person.industries?.name ?? null,
+    city: person.city,
+    state: person.state,
+    specialties: person.specialties ?? [],
+    bio: person.bio,
+    educations: [...person.educations].sort((x, y) => (x.grad_year ?? 0) - (y.grad_year ?? 0)).map((e) => ({ school: e.school, degree: e.degree, major: e.major, gradYear: e.grad_year })),
+    positions: person.positions.map((p) => ({ title: p.title, organizationName: p.organization_name, isCurrent: p.is_current, startYear: Number(year(p.start_date)) || null, endYear: Number(year(p.end_date)) || null })),
+  });
 
   return (
     <>
@@ -224,22 +238,22 @@ async function Profile({ params, searchParams }: { params: PageProps<"/people/[i
 
       <div className="split">
         <div className="stack">
-          {person.ai_summary?.length ? (
-            <section className="panel pad">
-              <div className="section-head">
-                <h2>At a glance</h2>
-                <span className="chip ai">AI-generated summary</span>
-              </div>
-              <ul className="glance-list">
-                {person.ai_summary.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
+          <section className="panel pad">
+            <div className="section-head">
+              <h2>At a glance</h2>
+              {person.ai_summary?.length ? <span className="chip ai">AI-generated summary</span> : <span className="chip subtle">From profile details</span>}
+            </div>
+            <ul className="glance-list">
+              {glance.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            {person.ai_summary?.length ? (
               <p className="meta" style={{ marginTop: 16 }}>
                 AI can miss context. Review the experience and source details below.
               </p>
-            </section>
-          ) : null}
+            ) : null}
+          </section>
 
           {person.bio && (
             <section className="panel pad">

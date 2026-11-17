@@ -72,6 +72,10 @@ Every unclaimed profile with a gap was looked up once with Keenable, Serper, Exa
 
 This ran against the local database. Production needs the same run from `/admin/people` → "Fill in what's missing".
 
+## Summaries (2026-11-16)
+
+Every profile opens with a three-bullet "At a glance". The model writes it from stored facts; when it writes fewer than three, or can't be reached, plain sentences built from the same facts fill in (`lib/summaries.ts`), and the profile page does the same top-up at display time for a profile nothing has summarized yet. Summaries are rewritten after a web lookup, a member's profile edit and an admin review, and the daily cron summarizes up to 15 new profiles where Inngest isn't set up.
+
 ## To do before or at deploy
 
 1. **Push the eight `20261112…` migrations and `20261116000100_contact_searches` to production** (`npm run deploy:db`). Deploys don't migrate; until this runs, the new pages error in production.

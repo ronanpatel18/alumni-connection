@@ -66,3 +66,52 @@ describe("AI layer in fixture mode", () => {
     expect(draft.body).toContain("Hi Jordan");
   });
 });
+
+describe("the three-bullet summary every profile shows", () => {
+  const full = {
+    fullName: "Jane Kowalczyk",
+    currentTitle: "Managing Director",
+    organizationName: "Lakeshore Capital Partners",
+    industryName: "Finance & Investing",
+    city: "Madison",
+    state: "WI",
+    specialties: ["private credit", "real estate"],
+    bio: null,
+    educations: [{ school: "University of Wisconsin–Madison", degree: "BBA", major: "Finance", gradYear: 2009 }],
+    positions: [
+      { title: "Managing Director", organizationName: "Lakeshore Capital Partners", isCurrent: true, startYear: 2018, endYear: null },
+      { title: "Associate", organizationName: "Northwoods Bank", isCurrent: false, startYear: 2009, endYear: 2018 },
+    ],
+  };
+  const empty = { ...full, currentTitle: null, organizationName: null, industryName: null, city: null, state: null, specialties: [], educations: [], positions: [] };
+
+  it("keeps three written bullets exactly as they are", async () => {
+    const { threeBullets } = await import("@/lib/summaries");
+    expect(threeBullets(["One.", "Two.", "Three.", "Four."], full)).toEqual(["One.", "Two.", "Three."]);
+  });
+
+  it("tops up a short summary with stored facts that add something new", async () => {
+    const { threeBullets } = await import("@/lib/summaries");
+    const out = threeBullets(["Serves as Managing Director at Lakeshore Capital Partners in Madison, Wisconsin."], full);
+    expect(out).toHaveLength(3);
+    expect(out[1]).toBe("Education: BBA, Finance from UW–Madison (2009).");
+    expect(out[2]).toBe("Earlier roles at Northwoods Bank.");
+  });
+
+  it("builds three from facts alone when nothing was written", async () => {
+    const { threeBullets } = await import("@/lib/summaries");
+    expect(threeBullets(null, full)).toEqual([
+      "Managing Director at Lakeshore Capital Partners, based in Madison, WI.",
+      "Education: BBA, Finance from UW–Madison (2009).",
+      "Earlier roles at Northwoods Bank.",
+    ]);
+  });
+
+  it("still gives three honest lines for a profile that is only a name", async () => {
+    const { threeBullets } = await import("@/lib/summaries");
+    const out = threeBullets([], empty);
+    expect(out).toHaveLength(3);
+    expect(out.join(" ")).not.toMatch(/Lakeshore|Madison, WI|2009/);
+    expect(out[0]).toBe("Part of the University of Wisconsin–Madison alumni network.");
+  });
+});

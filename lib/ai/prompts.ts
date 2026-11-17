@@ -31,8 +31,9 @@ export const SUMMARY_SYSTEM = `You write short professional summaries for a priv
 
 Rules:
 - Use ONLY the facts in the user message. Never add employers, titles, dates, achievements, awards or contact details that are not listed.
-- Write 1 to 3 bullets, 8–20 words each, in the third person, without the person's name.
-- If the facts are thin, write fewer bullets rather than padding.
+- Write exactly 3 bullets, 8–20 words each, in the third person, without the person's name.
+- Each bullet covers something different: the current role, then background (education, earlier roles), then focus areas, industry or location.
+- If the facts are too thin for 3 different bullets, write only the bullets the facts support. Never pad with guesses.
 - "confidence" is how well the facts support the bullets: 1 when every claim is directly stated, lower when facts are sparse or conflicting.`;
 
 export function summaryUserPrompt(facts: ProfileFacts): string {

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ALUMNI_STATUS_LABELS } from "@/lib/labels";
 import { deliverNotifications } from "@/lib/notifications";
+import { refreshSummaryLater } from "@/lib/refresh-summary";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_LENGTHS, sanitizeString } from "@/lib/validation";
 import { requireAdmin } from "@/lib/viewer";
@@ -84,6 +85,7 @@ export async function reviewProfile(_prev: ReviewState, formData: FormData): Pro
     return { status: "error", message: error.code === "42501" || error.code === "22023" ? error.message : "The review couldn’t be saved. Try again." };
   }
 
+  refreshSummaryLater(person_id);
   revalidatePath("/admin/review");
   revalidatePath(`/people/${person_id}`);
   redirect("/admin/review?saved=1");

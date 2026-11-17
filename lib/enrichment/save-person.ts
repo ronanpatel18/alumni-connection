@@ -1,6 +1,7 @@
 // Creates a profile from a name and saves what lookupPerson() found for it.
 // Takes the database client as an argument (a service-role client), so the
 // admin page, the background job and the script all share it.
+import { summarizePerson } from "@/lib/summaries";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Ai } from "@/lib/ai";
 import { nameKey } from "@/lib/importers/roster";
@@ -293,6 +294,8 @@ export async function runPersonLookup(db: SupabaseClient, ai: Ai, { personId, jo
       { ai, industries: industries ?? [] },
     );
     const changes = await savePersonFindings(db, personId, findings);
+    // The profile just changed: its three-bullet summary is rewritten from what was found.
+    await summarizePerson(db, ai, personId).catch(() => undefined);
     const hasClassYear = findings.educations.some((e) => e.gradYear);
     return finish({ status: changes.length && hasClassYear && !findings.notes.length ? "succeeded" : "needs_review", changes, notes: findings.notes });
   } catch (error) {
