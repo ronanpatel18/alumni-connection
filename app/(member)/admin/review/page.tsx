@@ -41,7 +41,7 @@ async function Queue({ searchParams }: { searchParams: PageProps<"/admin/review"
         <div className="table-title">
           <div className="section-head" style={{ margin: 0 }}>
             <h2>Profile review queue</h2>
-            <span className="badge-count">{rows.length} awaiting review</span>
+            <span className="badge-count whitespace-nowrap">{rows.length} awaiting review</span>
           </div>
           <p className="meta" style={{ marginTop: 8 }}>
             Unclaimed profiles built from public sources with something missing or unconfirmed. Members edit their own profiles, so
@@ -72,7 +72,7 @@ async function Queue({ searchParams }: { searchParams: PageProps<"/admin/review"
             text="New profiles with missing or unconfirmed details will appear here. A clear queue doesn’t mean every profile is confirmed."
           />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap table-inset review-queue">
             <table className="responsive">
               <thead>
                 <tr>
@@ -98,7 +98,7 @@ async function Queue({ searchParams }: { searchParams: PageProps<"/admin/review"
                     <td>
                       <div className="od-cluster">
                         {r.reasons.map((code) => (
-                          <span key={code} className="chip">
+                          <span key={code} className="chip whitespace-nowrap">
                             {REVIEW_REASON_LABELS[code] ?? code}
                           </span>
                         ))}

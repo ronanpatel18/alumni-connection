@@ -106,7 +106,7 @@ function Preview({ result }: { result: Extract<RosterState, { status: "preview" 
         </div>
       </div>
       {total > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap table-inset">
           <table className="responsive">
             <thead>
               <tr>

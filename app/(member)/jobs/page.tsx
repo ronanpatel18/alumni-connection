@@ -43,9 +43,14 @@ async function Jobs({ searchParams }: { searchParams: PageProps<"/jobs">["search
   const { q, industry, refer, result } = await searchParams;
   const query = (typeof q === "string" ? q : "").trim().toLowerCase();
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("job_board");
+  // The board also lists the viewer's own closed and expired posts; it doesn't say which are closed.
+  const [{ data, error }, { data: closedRows }] = await Promise.all([
+    supabase.rpc("job_board"),
+    supabase.from("job_posts").select("id").eq("posted_by", viewer.userId).not("closed_at", "is", null),
+  ]);
   if (error) throw error;
   const all = (data ?? []) as Job[];
+  const closed = new Set((closedRows ?? []).map((r) => r.id as string));
   const industries = [...new Map(all.filter((j) => j.industry_id).map((j) => [String(j.industry_id), j.industry_name ?? ""])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const today = all.length ? new Date().toISOString().slice(0, 10) : "";
   const jobs = all.filter(
@@ -58,7 +63,7 @@ async function Jobs({ searchParams }: { searchParams: PageProps<"/jobs">["search
   return (
     <>
       <ResultNotice result={result} messages={RESULTS} />
-      <form className="filter-row" action="/jobs" role="search" style={{ margin: "0 0 24px" }}>
+      <form key={[q, industry, refer].map(String).join("|")} className="filter-row" action="/jobs" role="search" style={{ margin: "0 0 24px" }}>
         <input name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Title, employer or city" aria-label="Search jobs" style={{ maxWidth: 280 }} />
         <select name="industry" defaultValue={typeof industry === "string" ? industry : ""} aria-label="Industry">
           <option value="">Every industry</option>
@@ -95,14 +100,15 @@ async function Jobs({ searchParams }: { searchParams: PageProps<"/jobs">["search
         <section className="panel">
           <div className="detail-list">
             {jobs.map((j) => {
-              const open = j.expires_on >= today;
+              const isClosed = closed.has(j.id);
+              const open = !isClosed && j.expires_on >= today;
               return (
                 <div key={j.id} className="detail-row" style={{ padding: 24 }}>
                   <div className="od-cluster" style={{ justifyContent: "space-between" }}>
                     <h3>{j.title}</h3>
                     <span className="od-cluster">
                       {j.can_refer && <span className="chip success">Will refer</span>}
-                      {!open && <span className="chip">Expired</span>}
+                      {isClosed ? <span className="chip">Closed</span> : !open && <span className="chip">Expired</span>}
                     </span>
                   </div>
                   <p className="small">
@@ -127,7 +133,7 @@ async function Jobs({ searchParams }: { searchParams: PageProps<"/jobs">["search
                         View posting
                       </a>
                     )}
-                    {(j.is_mine || viewer.isAdmin) && (
+                    {(j.is_mine || viewer.isAdmin) && !isClosed && (
                       <form action={closeJob}>
                         <input type="hidden" name="id" value={j.id} />
                         <button type="submit" className="btn quiet">

@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { EmptyState, OPEN_TO_LABELS, PageTitle, PersonRow, type PersonSummary } from "@/components/person";
 import { SearchModeTabs } from "@/components/search-mode-tabs";
 import { getAi } from "@/lib/ai";
+import { withDeadline } from "@/lib/ai/deadline";
 import { groupCues, linkedinUrls, savedIds } from "@/lib/people";
 import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 import { type ActiveFilters, DEFAULT_RADIUS, filterChips, type FilterNames, preferenceRecovery, radiusChoices, type SearchRecovery } from "@/lib/search/filters";
@@ -18,6 +19,8 @@ import { requireMember } from "@/lib/viewer";
 export const metadata: Metadata = { title: "People" };
 
 const PAGE_SIZE = 10;
+/** How long the directory waits for the model to read free text before using the rule parse. */
+const MODEL_PARSE_MS = 8_000;
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -70,7 +73,7 @@ async function SearchFilters({ searchParams }: { searchParams: Promise<SearchPar
           Search alumni
         </button>
       </div>
-      <div className="filter-row">
+      <div className="filter-row stretch">
         <label className="sr-only" htmlFor="industry">
           Industry
         </label>
@@ -113,11 +116,11 @@ async function SearchFilters({ searchParams }: { searchParams: Promise<SearchPar
         <label className="sr-only" htmlFor="from">
           Class from
         </label>
-        <input id="from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={first(params.from)} style={{ width: 128 }} />
+        <input id="from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={first(params.from)} />
         <label className="sr-only" htmlFor="to">
           Class to
         </label>
-        <input id="to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={first(params.to)} style={{ width: 128 }} />
+        <input id="to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={first(params.to)} />
         <label className="sr-only" htmlFor="open">
           Open to
         </label>
@@ -167,9 +170,16 @@ async function SearchResults({ searchParams }: { searchParams: Promise<SearchPar
   const q = searchText(params);
   let parsed = q ? parseSearchText(q, vocab) : null;
   if (parsed?.needsModel && getAi().config.mode !== "fixture") {
-    const query = await getAi().parseSearchQuery(q, vocab);
-    const place = places.find((p) => p.name === query.city && p.state === query.state);
-    parsed = { query, placeId: place?.id ?? null, needsModel: false };
+    // A model failure (free-tier limit, outage, slow host) keeps the rule parse
+    // instead of failing the whole page.
+    const query = await withDeadline(getAi().parseSearchQuery(q, vocab), MODEL_PARSE_MS).catch((error) => {
+      console.warn("[search] interpreting the text failed; using rules", error instanceof Error ? error.message : error);
+      return null;
+    });
+    if (query) {
+      const place = places.find((p) => p.name === query.city && p.state === query.state);
+      parsed = { query, placeId: place?.id ?? null, needsModel: false };
+    }
   }
 
   // Explicit filters win over what was parsed from the text.

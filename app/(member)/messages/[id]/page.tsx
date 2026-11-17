@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Icon } from "@/components/icon";
+import { LocalTime } from "@/components/local-time";
 import { PageTitle } from "@/components/person";
 import { RelationshipTabs } from "@/components/relationship-tabs";
 import { createClient } from "@/lib/supabase/server";
@@ -47,7 +48,7 @@ async function Thread({ params, searchParams }: { params: PageProps<"/messages/[
             return (
               <li key={m.id} className={`bubble${mine ? " mine" : ""}`}>
                 <span className="meta">
-                  {mine ? "You" : convo.other_name} · {new Date(m.created_at as string).toLocaleString()}
+                  {mine ? "You" : convo.other_name} · <LocalTime iso={m.created_at as string} />
                 </span>
                 <p className="bio">{m.body as string}</p>
               </li>

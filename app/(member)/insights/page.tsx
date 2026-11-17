@@ -94,7 +94,7 @@ async function Filters({ searchParams }: { searchParams: Params }) {
   const { industries, places } = await getVocabulary();
   const sectors = industries.filter((i) => i.parent_id === null);
   return (
-    <form id="insight-filters" className="filter-row" style={{ margin: "0 0 24px" }} method="get">
+    <form key={JSON.stringify(params)} id="insight-filters" className="filter-row" style={{ margin: "0 0 24px" }} method="get">
       <AutoSubmit formId="insight-filters" />
       <label className="field small">
         Industry

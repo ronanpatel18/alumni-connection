@@ -11,7 +11,7 @@ import { requireMember } from "@/lib/viewer";
 export type MessageState =
   | { status: "idle" }
   | { status: "sent"; count: number }
-  | { status: "error"; message: string; body?: string; attempt: number };
+  | { status: "error"; message: string; subject?: string; body?: string; attempt: number };
 
 const text = (max: number) => z.string().max(max).transform(sanitizeString);
 const startSchema = z.object({
@@ -31,7 +31,7 @@ export async function startConversation(prev: MessageState, formData: FormData):
     subject: formData.get("subject") ?? "",
     body: formData.get("body") ?? "",
   });
-  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the message.", body: String(formData.get("body") ?? ""), attempt };
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the message.", subject: String(formData.get("subject") ?? ""), body: String(formData.get("body") ?? ""), attempt };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("start_conversation", {
@@ -42,9 +42,10 @@ export async function startConversation(prev: MessageState, formData: FormData):
   });
   if (error) {
     const known = ["P0002", "22023", "54000", "42501"].includes(error.code ?? "");
-    return { status: "error", message: known ? error.message : "The message couldn’t be sent. Try again.", body: parsed.data.body, attempt };
+    return { status: "error", message: known ? error.message : "The message couldn’t be sent. Try again.", subject: parsed.data.subject, body: parsed.data.body, attempt };
   }
-  await deliverNotifications();
+  // The message is saved; a failed email is retried by the outbox job, so it mustn't fail the send.
+  await deliverNotifications().catch(() => undefined);
   revalidatePath("/messages");
   redirect(`/messages/${data as string}?sent=1`);
 }
@@ -59,7 +60,7 @@ export async function sendReply(prev: MessageState, formData: FormData): Promise
   const supabase = await createClient();
   const { error } = await supabase.rpc("send_message", { p_conversation: parsed.data.conversation_id, p_body: parsed.data.body });
   if (error) return { status: "error", message: "The message couldn’t be sent. Try again.", body: parsed.data.body, attempt };
-  await deliverNotifications();
+  await deliverNotifications().catch(() => undefined);
   revalidatePath(`/messages/${parsed.data.conversation_id}`);
   return { status: "sent", count: (prev.status === "sent" ? prev.count : 0) + 1 };
 }

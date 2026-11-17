@@ -95,7 +95,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
 async function SavedSearch({ searchParams }: { searchParams: PageProps<"/saved">["searchParams"] }) {
   const { q } = await searchParams;
   return (
-    <form className="field" style={{ maxWidth: 480, marginBottom: 24 }} action="/saved" role="search">
+    <form key={String(q)} className="field" style={{ maxWidth: 480, marginBottom: 24 }} action="/saved" role="search">
       <label htmlFor="saved-search">Find a saved contact</label>
       <input id="saved-search" name="q" defaultValue={typeof q === "string" ? q : ""} placeholder="Search name, company, or city" />
     </form>

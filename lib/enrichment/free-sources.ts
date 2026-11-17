@@ -89,16 +89,22 @@ async function getJson<T>(url: string): Promise<T | null> {
 }
 
 /** A web page as plain text (cached, polite, HTML only, at most 60k characters). */
-export async function fetchPageText(url: string): Promise<string | null> {
+/**
+ * A page as plain text. With `links`, the targets of mailto: and tel: links
+ * are written beside the link's own text, since "Email Jane" on a team page
+ * holds the address only in the link.
+ */
+export async function fetchPageText(url: string, { links = false }: { links?: boolean } = {}): Promise<string | null> {
   const store = await loadCache();
-  const key = `page:${url}`;
+  const key = `${links ? "page+links" : "page"}:${url}`;
   const hit = store[key];
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.body as string | null;
   const response = await politeFetch(url, "text/html");
   let text: string | null = null;
   if (response?.ok && (response.headers.get("content-type") ?? "").includes("text/html")) {
     try {
-      text = htmlToText(await response.text()).slice(0, 60_000);
+      const html = await response.text();
+      text = htmlToText(links ? withLinkTargets(html) : html).slice(0, 60_000);
     } catch {
       text = null;
     }
@@ -106,6 +112,26 @@ export async function fetchPageText(url: string): Promise<string | null> {
   store[key] = { at: Date.now(), body: text };
   await saveCache();
   return text;
+}
+
+/** `<a href="mailto:jane@x.com">Email Jane</a>` becomes "Email Jane jane@x.com"; tel: links likewise. */
+export function withLinkTargets(html: string): string {
+  return html.replace(/<a\b[^>]*?\bhref\s*=\s*["'](mailto|tel):([^"'?]*)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, (_all, scheme: string, target: string, inner: string) => {
+    let value = target.trim();
+    try {
+      value = decodeURIComponent(value);
+    } catch {
+      // A badly encoded link: use it as written.
+    }
+    if (scheme.toLowerCase() === "tel") {
+      const digits = value.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+      if (digits.length !== 10 || inner.replace(/\D/g, "").includes(digits)) return inner;
+      value = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (!value.includes("@") || inner.toLowerCase().includes(value.toLowerCase())) {
+      return inner;
+    }
+    return `${inner} ${value} `;
+  });
 }
 
 /** HTML to readable text, keeping paragraph and line breaks (they separate people in lists). */

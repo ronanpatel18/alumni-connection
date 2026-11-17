@@ -14,12 +14,11 @@
 //   Without --write it only reports what it would save.
 import { createClient } from "@supabase/supabase-js";
 import { formatUsPhone } from "@/lib/enrichment/contacts/extract";
-import { buildSuppression, findContactsFor, type PersonReport } from "@/lib/enrichment/contacts/pipeline";
+import { findContactsFor, type PersonReport } from "@/lib/enrichment/contacts/pipeline";
+import { CONTACT_PERSON_COLUMNS, type ContactPersonRow, loadSuppression, networkContext, saveReport, toPersonRef } from "@/lib/enrichment/contacts/run";
 import { CONTACT_SOURCES } from "@/lib/enrichment/contacts/sources";
-import type { PersonRef, SourceContext } from "@/lib/enrichment/contacts/types";
 import { configuredVerifier } from "@/lib/enrichment/contacts/validate";
-import { fetchPageText } from "@/lib/enrichment/free-sources";
-import { searchConfigured, webSearch } from "@/lib/enrichment/search";
+import { searchConfigured } from "@/lib/enrichment/search";
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(name);
@@ -35,47 +34,6 @@ const names = list(arg("--names"));
 const only = list(arg("--sources"));
 const group = arg("--group");
 const limit = Number(arg("--limit") ?? Infinity);
-
-interface Row {
-  id: string;
-  institution_id: string;
-  full_name: string;
-  first_name: string | null;
-  last_name: string | null;
-  current_title: string | null;
-  city: string | null;
-  state: string | null;
-  organizations: { name: string; domain: string | null; website: string | null } | null;
-  industries: { slug: string } | null;
-  contact_points: { kind: string; value: string; source: string }[];
-}
-
-const domainOf = (org: Row["organizations"]) => {
-  if (org?.domain) return org.domain.toLowerCase();
-  try {
-    return org?.website ? new URL(org.website).hostname.replace(/^www\./, "") : null;
-  } catch {
-    return null;
-  }
-};
-
-function toPerson(row: Row): PersonRef {
-  const parts = row.full_name.trim().split(/\s+/);
-  return {
-    id: row.id,
-    institutionId: row.institution_id,
-    fullName: row.full_name,
-    firstName: row.first_name ?? parts[0],
-    lastName: row.last_name ?? parts[parts.length - 1],
-    title: row.current_title,
-    organizationName: row.organizations?.name ?? null,
-    orgDomain: domainOf(row.organizations),
-    industrySlug: row.industries?.slug ?? null,
-    city: row.city,
-    state: row.state,
-    existing: row.contact_points,
-  };
-}
 
 const show = (kind: string, value: string) => (kind === "phone" ? formatUsPhone(value) : value);
 
@@ -120,92 +78,25 @@ async function main() {
 
   let query = db
     .from("people")
-    .select(
-      "id, institution_id, full_name, first_name, last_name, current_title, city, state, " +
-        "organizations:current_organization_id(name, domain, website), industries:industry_id(slug), contact_points(kind, value, source)" +
-        (group ? ", group_memberships!inner(groups!inner(slug))" : ""),
-    )
+    .select(CONTACT_PERSON_COLUMNS + (group ? ", group_memberships!inner(groups!inner(slug))" : ""))
     .is("claimed_by_user_id", null) // members manage their own details
     .neq("status", "opted_out")
     .order("full_name");
   if (group) query = query.eq("group_memberships.groups.slug", group);
-  const [{ data, error }, suppressed] = await Promise.all([query.returns<Row[]>(), db.from("suppression_list").select("full_name, email_sha256")]);
+  const [{ data, error }, suppression] = await Promise.all([query.returns<ContactPersonRow[]>(), loadSuppression(db)]);
   if (error) throw error;
-  if (suppressed.error) throw suppressed.error;
-  const suppression = buildSuppression(suppressed.data);
   const people = data.filter((p) => !names || names.includes(p.full_name.toLowerCase())).slice(0, limit);
   console.log(`\n${people.length} profiles. ${write ? "Saving findings." : "Dry run (add --write to save)."}`);
 
-  const ctx: Omit<SourceContext, "note"> = {
-    env: process.env,
-    search: async (text, options) =>
-      (await webSearch(text, options)).flatMap((r) => (r.url ? [{ url: r.url, title: r.title ?? "", snippet: r.content ?? "" }] : [])),
-    fetchPage: fetchPageText,
-    async fetchJson(target, init) {
-      const response = await fetch(target, { headers: { Accept: "application/json", ...init?.headers }, signal: AbortSignal.timeout(20_000) });
-      // The URL can carry an API key, so errors name only the host.
-      if (!response.ok) throw new Error(`${new URL(target).host} answered ${response.status}`);
-      return response.json();
-    },
-  };
-
+  const ctx = networkContext();
   const tally = { stored: 0, review: 0, dropped: 0, skipped: 0 };
   for (const row of people) {
-    const report = await findContactsFor(toPerson(row), enabled, ctx, suppression);
+    const report = await findContactsFor(toPersonRef(row), enabled, ctx, suppression);
     print(report);
     if (report.skipped) tally.skipped++;
     tally.dropped += report.dropped.length;
     for (const f of report.findings) tally[f.status === "stored" ? "stored" : "review"]++;
-    if (!write || !report.findings.length) continue;
-
-    const now = new Date().toISOString();
-    // Findings already decided (or already queued) are left exactly as they are.
-    const { error: findingsError } = await db.from("contact_findings").upsert(
-      report.findings.map((f) => ({
-        person_id: row.id,
-        kind: f.kind,
-        value: f.value,
-        label: f.label,
-        source: f.source,
-        source_detail: f.sourceDetail,
-        source_url: f.sourceUrl,
-        evidence_quote: f.quote.slice(0, 600),
-        confidence: f.confidence,
-        verification: f.verification,
-        pattern_guessed: f.patternGuessed,
-        review_reasons: f.reviewReasons,
-        status: f.status,
-      })),
-      { onConflict: "person_id,kind,value,source", ignoreDuplicates: true },
-    );
-    if (findingsError) throw findingsError;
-
-    for (const f of report.findings.filter((x) => x.status === "stored")) {
-      // Private until an administrator chooses to show it.
-      const { error: pointError } = await db.from("contact_points").upsert(
-        {
-          person_id: row.id,
-          kind: f.kind,
-          value: f.value,
-          label: f.label,
-          source: f.source,
-          source_detail: f.sourceDetail,
-          source_url: f.sourceUrl,
-          verification: f.verification.status === "valid" ? "verifier" : "source_page",
-          verified_at: f.verification.status === "valid" ? now : null,
-          visibility: "private",
-        },
-        { onConflict: "person_id,kind,value", ignoreDuplicates: true },
-      );
-      if (pointError) throw pointError;
-      const { error: provenanceError } = await db
-        .from("field_provenance")
-        .upsert(
-          { person_id: row.id, field: "contact_points", source: f.source, confidence: f.confidence, source_url: f.sourceUrl, fetched_at: now },
-          { onConflict: "person_id,field,source" },
-        );
-      if (provenanceError) throw provenanceError;
-    }
+    if (write) await saveReport(db, row.id, report);
   }
 
   console.log(

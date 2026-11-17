@@ -23,7 +23,7 @@ export function DialogButton({ label, title, className = "btn quiet", children }
         <h2>{title}</h2>
         {children}
         <div className="form-actions">
-          <button type="button" className="btn primary" onClick={close}>
+          <button type="button" className="btn" onClick={close}>
             Close
           </button>
         </div>

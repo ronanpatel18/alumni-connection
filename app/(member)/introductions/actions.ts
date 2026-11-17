@@ -39,7 +39,8 @@ export async function requestIntro(prev: RequestState, formData: FormData): Prom
     const known = ["23505", "22023", "42501"].includes(error.code ?? "");
     return { status: "error", message: known ? error.message : "The request couldn’t be sent. Try again.", values, attempt };
   }
-  await deliverNotifications(); // emails the connector
+  // The request is saved; a failed email is retried by the outbox job, so it mustn't fail the request.
+  await deliverNotifications().catch(() => undefined); // emails the connector
   revalidatePath("/introductions");
   redirect(`/introductions/${data as string}?sent=1`);
 }
@@ -53,11 +54,16 @@ export async function decideIntro(formData: FormData) {
   if (!parsed.success) redirect("/introductions");
   const role = formData.get("role") === "connector" ? "connector" : "recipient";
   const supabase = await createClient();
-  await supabase.rpc(role === "connector" ? "decide_intro_as_connector" : "decide_intro_as_recipient", {
+  const { error } = await supabase.rpc(role === "connector" ? "decide_intro_as_connector" : "decide_intro_as_recipient", {
     p_intro: parsed.data.intro_id,
     ...(role === "connector" ? { p_agree: parsed.data.choice === "yes" } : { p_accept: parsed.data.choice === "yes" }),
   });
-  await deliverNotifications(); // emails whoever is next, and the requester about the outcome
+  // Already decided, expired or not theirs: show the request as it stands, without claiming a decision was recorded.
+  if (error) {
+    revalidatePath("/introductions");
+    redirect(`/introductions/${parsed.data.intro_id}`);
+  }
+  await deliverNotifications().catch(() => undefined); // emails whoever is next, and the requester about the outcome
   revalidatePath("/introductions");
   redirect(`/introductions/${parsed.data.intro_id}?decided=1`);
 }

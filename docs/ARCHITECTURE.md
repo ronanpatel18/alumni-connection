@@ -188,10 +188,11 @@ Code: `lib/enrichment/providers.ts` (search providers), `person-lookup.ts` (name
 
 ## 3c. Contact enrichment as built (`npm run contacts`)
 
-Code: `lib/enrichment/contacts/` (extraction, validity checks, sources, decisions), `scripts/find-contacts.ts`, migration `…contact_enrichment`, review at `/admin/contacts`.
+Code: `lib/enrichment/contacts/` (extraction, validity checks, sources, decisions, and `run.ts`, which searches a batch and saves it), `scripts/find-contacts.ts`, migrations `…contact_enrichment` and `…contact_searches`. Searches start from `/admin/contacts` (ten profiles a click, through Inngest or after the response where there's no queue) or the script; review is on the same page.
 
 - **No model anywhere.** Emails and phones are read with patterns, kept only when their quote is on the source page or they came from a licensed API, and attributed only when the page names the person beside the value.
-- **Order:** suppression list → free public sources → licensed APIs whose key is set → proof → validity → store privately or queue for review.
+- **Order:** suppression list → free public sources, side by side → licensed APIs whose key is set → proof → validity → store privately or queue for review.
+- **Finding the person's own page:** the employer search goes to every configured search provider at once (they return different pages), up to six pages are read per search, and `mailto:`/`tel:` link targets count as page text ("Email Jane" holds the address only in the link).
 - **Shown to members only after an administrator approves**, and only work details that passed a validity check. A pattern-built work address needs a verifier's "valid" and is labeled as such.
 - **Not worked around:** sign-in walls, bot checks and CAPTCHAs. LinkedIn profile pages and most people-search result pages are behind them, so the free path reads search snippets and whatever a plain page fetch returns. Reliable coverage of either needs a scraping vendor (stub adapter).
 - **Per-source deletion:** `delete_contacts_from_source(source, source_detail)`.

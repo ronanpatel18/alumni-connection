@@ -57,7 +57,7 @@ async function AskForm({ searchParams }: { searchParams: Promise<AskParams> }) {
 
 function Examples() {
   return (
-    <div className="panel">
+    <div className="panel" style={{ marginTop: 24 }}>
       <div className="empty">
         <Icon name="search" />
         <h2>Start with what you’re working toward</h2>
@@ -154,7 +154,7 @@ function AdjustFilters({ ask, filters, places, industries }: { ask: string; filt
   return (
     <details style={{ marginBottom: 24 }}>
       <summary>Adjust what was understood</summary>
-      <form action="/search/ask" className="filter-row" style={{ marginTop: 16 }}>
+      <form action="/search/ask" className="filter-row stretch" style={{ marginTop: 16 }}>
         <input type="hidden" name="ask" value={ask} />
         <input type="hidden" name="edited" value="1" />
         {/* Extra values beyond the first stay applied; remove them with their chips. */}
@@ -211,11 +211,11 @@ function AdjustFilters({ ask, filters, places, industries }: { ask: string; filt
         <label className="sr-only" htmlFor="ask-from">
           Class from
         </label>
-        <input id="ask-from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={filters.gradFrom ?? ""} style={{ width: 128 }} />
+        <input id="ask-from" name="from" type="number" min={1940} max={2035} placeholder="Class from" defaultValue={filters.gradFrom ?? ""} />
         <label className="sr-only" htmlFor="ask-to">
           Class to
         </label>
-        <input id="ask-to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={filters.gradTo ?? ""} style={{ width: 128 }} />
+        <input id="ask-to" name="to" type="number" min={1940} max={2035} placeholder="Class to" defaultValue={filters.gradTo ?? ""} />
         <label className="sr-only" htmlFor="ask-open">
           Open to
         </label>

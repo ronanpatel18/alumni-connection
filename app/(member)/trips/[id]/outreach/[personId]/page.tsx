@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Avatar, isConfirmed, PageTitle } from "@/components/person";
 import { TripSteps } from "@/components/trip-steps";
 import { getAi } from "@/lib/ai";
+import { withDeadline } from "@/lib/ai/deadline";
 import { createClient } from "@/lib/supabase/server";
 import { loadTrip, tripCity, tripDates, tripTimeZone } from "@/lib/trips";
 import { requireMember } from "@/lib/viewer";
@@ -72,7 +73,8 @@ async function Outreach({ params }: { params: PageProps<"/trips/[id]/outreach/[p
   let draft = existing;
   if (!draft) {
     try {
-      const written = await getAi().draftOutreach({
+      // A slow or overloaded model mustn't hold the page open; the plain draft below is used instead.
+      const written = await withDeadline(getAi().draftOutreach({
         senderName: sender?.full_name ?? "[Your name]",
         senderHeadline: sender?.headline ?? null,
         recipientName: person.full_name,
@@ -81,7 +83,7 @@ async function Outreach({ params }: { params: PageProps<"/trips/[id]/outreach/[p
         sharedContext: [],
         recipientGroups: groups.slice(0, 3),
         trip: { city: tripCity(trip), dates: tripDates(trip) },
-      });
+      }));
       draft = { ...written, ai_drafted: true };
       await supabase.from("outreach_drafts").insert({ owner_user_id: viewer.userId, person_id: person.id, trip_id: trip.id, ...draft });
     } catch {

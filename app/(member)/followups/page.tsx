@@ -135,7 +135,8 @@ function Section({ title, count, rows, state, empty }: { title: string; count?: 
 
 async function FollowUps({ searchParams }: { searchParams: PageProps<"/followups">["searchParams"] }) {
   const viewer = await requireMember("/followups");
-  const { person, result } = await searchParams;
+  const { person, result, saved } = await searchParams;
+  // The log form is keyed by these, so it is fresh after each save and when "Log another" picks someone else.
   const personParam = typeof person === "string" && /^[0-9a-f-]{36}$/i.test(person) ? person : null;
   const { error, due, upcoming, log, choices, chosen, today } = await loadFollowUps(viewer.userId, personParam);
   if (error) throw error;
@@ -150,7 +151,7 @@ async function FollowUps({ searchParams }: { searchParams: PageProps<"/followups
       </div>
       <aside className="right-rail stack" id="log">
         {choices.length ? (
-          <ActionForm action={logInteraction} submitLabel="Save" pendingLabel="Saving…">
+          <ActionForm key={[personParam, result, saved].map(String).join("|")} action={logInteraction} submitLabel="Save" pendingLabel="Saving…">
             <h2 className="rail-title">Log a conversation</h2>
             <div className="stack" style={{ gap: 16 }}>
               <div className="field">

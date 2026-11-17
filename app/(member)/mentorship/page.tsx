@@ -159,7 +159,7 @@ async function Mentorship({ searchParams }: { searchParams: PageProps<"/mentorsh
             </div>
           </section>
         )}
-        <form className="filter-row" action="/mentorship" style={{ margin: 0 }}>
+        <form key={[industry, city].map(String).join("|")} className="filter-row" action="/mentorship" style={{ margin: 0 }}>
           <select name="industry" defaultValue={typeof industry === "string" ? industry : ""} aria-label="Industry">
             <option value="">Every industry</option>
             {industries.map(([id, name]) => (

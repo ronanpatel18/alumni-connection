@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
 import { Icon } from "@/components/icon";
+import { useKeptInputAction } from "@/components/use-kept-input-action";
 import { type FormState, saveContacts } from "../actions";
 
 export interface ContactRow {
@@ -42,10 +42,10 @@ function ContactField({ row, error }: { row: ContactRow; error?: string }) {
 }
 
 export function ContactsForm({ rows }: { rows: ContactRow[] }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(saveContacts, { status: "idle" });
+  const [state, submit, pending] = useKeptInputAction<FormState>(saveContacts, { status: "idle" });
   const errors = state.status === "error" ? (state.fields ?? {}) : {};
   return (
-    <form action={action} className="panel pad">
+    <form onSubmit={submit} className="panel pad">
       <h2>Contact details</h2>
       <p className="small muted" style={{ margin: "12px 0 24px" }}>
         Everything here is visible to all verified members, meaning alumni who have completed verification. Leave a field blank to keep it off
